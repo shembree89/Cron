@@ -33,6 +33,7 @@ const game = {
     height: 0,
     running: true,
     paused: false, // For level-up menu
+    dead: false,   // Player is dead
     lastTime: 0,
     deltaTime: 0,
     time: 0
@@ -190,6 +191,15 @@ function setupTouchControls() {
         const x = t.clientX;
         const y = t.clientY;
 
+        // Handle death screen restart button tap
+        if (game.dead) {
+            if (x >= deathRestartButton.x && x <= deathRestartButton.x + deathRestartButton.width &&
+                y >= deathRestartButton.y && y <= deathRestartButton.y + deathRestartButton.height) {
+                restartGame();
+            }
+            return; // Don't process other input when dead
+        }
+
         // Handle level-up menu taps
         if (levelUpMenu.active) {
             handleLevelUpMenuTap(x, y);
@@ -282,40 +292,26 @@ function setupTouchControls() {
 
 // Handle taps on the level-up menu
 function handleLevelUpMenuTap(x, y) {
-    const centerX = game.width / 2;
-    const centerY = game.height / 2;
-
     if (levelUpMenu.selectedPath === null) {
-        // Check if tap is on one of the 3 path boxes
-        const paths = ['bash', 'ping', 'init'];
-        const pathWidth = 200;
-        const startX = centerX - pathWidth * 1.5;
-
-        for (let i = 0; i < paths.length; i++) {
-            const boxX = startX + i * pathWidth + pathWidth / 2 - 80;
-            const boxY = centerY - 60;
-
-            if (x >= boxX && x <= boxX + 160 && y >= boxY && y <= boxY + 120) {
-                // Tapped on path i
-                selectPath(paths[i]);
+        // Check path buttons
+        for (const btn of levelUpButtons.paths) {
+            if (x >= btn.x && x <= btn.x + btn.width && y >= btn.y && y <= btn.y + btn.height) {
+                selectPath(btn.pathId);
                 return;
             }
         }
     } else {
-        // Check for back button tap (top area)
-        if (y < centerY - 50) {
+        // Check back button
+        const back = levelUpButtons.backButton;
+        if (x >= back.x && x <= back.x + back.width && y >= back.y && y <= back.y + back.height) {
             levelUpMenu.selectedPath = null;
             return;
         }
 
-        // Check if tap is on one of the ability boxes
-        for (let i = 0; i < levelUpMenu.availableAbilities.length; i++) {
-            const boxY = centerY - 30 + i * 50 - 18;
-            const boxX = centerX - 200;
-
-            if (x >= boxX && x <= boxX + 400 && y >= boxY && y <= boxY + 40) {
-                // Tapped on ability i
-                const ability = levelUpMenu.availableAbilities[i];
+        // Check ability buttons
+        for (const btn of levelUpButtons.abilities) {
+            if (x >= btn.x && x <= btn.x + btn.width && y >= btn.y && y <= btn.y + btn.height) {
+                const ability = levelUpMenu.availableAbilities[btn.index];
                 unlockAbility(ability);
                 return;
             }
@@ -800,7 +796,13 @@ function gameLoop(timestamp) {
         renderLevelUpMenu();
     }
 
-    if (game.running) {
+    // Draw death screen on top if dead
+    if (game.dead) {
+        renderDeathScreen();
+    }
+
+    // Keep running even when dead (to show death screen) or paused
+    if (game.running || game.dead) {
         requestAnimationFrame(gameLoop);
     }
 }
@@ -1075,7 +1077,7 @@ function update() {
             }
 
             if (player.health <= 0) {
-                showMessage('PROCESS TERMINATED — Refresh to restart', 10000);
+                game.dead = true;
                 game.running = false;
             }
         }
@@ -1579,120 +1581,272 @@ function drawZombieProcess(e) {
     ctx.shadowBlur = 0;
 }
 
-// Render level-up menu overlay
-function renderLevelUpMenu() {
-    // Semi-transparent overlay
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+// Death screen restart button bounds (for touch detection)
+const deathRestartButton = { x: 0, y: 0, width: 200, height: 60 };
+
+// Render death screen with restart button
+function renderDeathScreen() {
+    // Dark overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
     ctx.fillRect(0, 0, game.width, game.height);
 
     const centerX = game.width / 2;
     const centerY = game.height / 2;
 
     // Title
-    ctx.font = 'bold 32px Orbitron, monospace';
+    ctx.font = 'bold 36px Orbitron, monospace';
+    ctx.fillStyle = COLORS.red;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowColor = COLORS.red;
+    ctx.shadowBlur = 20;
+    ctx.fillText('PROCESS TERMINATED', centerX, centerY - 80);
+
+    // Subtitle
+    ctx.font = '18px monospace';
+    ctx.fillStyle = COLORS.white;
+    ctx.shadowBlur = 0;
+    ctx.fillText(`PID gained: ${player.xp}`, centerX, centerY - 30);
+
+    // Restart button
+    const btnWidth = 200;
+    const btnHeight = 60;
+    const btnX = centerX - btnWidth / 2;
+    const btnY = centerY + 20;
+
+    // Store button bounds for touch detection
+    deathRestartButton.x = btnX;
+    deathRestartButton.y = btnY;
+    deathRestartButton.width = btnWidth;
+    deathRestartButton.height = btnHeight;
+
+    // Button background
+    ctx.strokeStyle = COLORS.cyan;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = COLORS.cyan;
+    ctx.shadowBlur = 15;
+    ctx.strokeRect(btnX, btnY, btnWidth, btnHeight);
+    ctx.fillStyle = 'rgba(0, 255, 255, 0.15)';
+    ctx.fillRect(btnX, btnY, btnWidth, btnHeight);
+
+    // Button text
+    ctx.font = 'bold 24px Orbitron, monospace';
+    ctx.fillStyle = COLORS.cyan;
+    ctx.fillText('RESTART', centerX, btnY + btnHeight / 2);
+
+    ctx.shadowBlur = 0;
+}
+
+// Reset game to initial state
+function restartGame() {
+    // Reset player
+    player.x = game.width / 2;
+    player.y = game.height / 2;
+    player.health = player.maxHealth;
+    player.stamina = player.maxStamina;
+    player.xp = 0;
+    player.level = 0;
+    player.skillPoints = 0;
+    player.unlockedAbilities = [];
+    player.attackCooldown = 0;
+
+    // Clear entities
+    enemies.length = 0;
+    projectiles.length = 0;
+    particles.length = 0;
+    pickups.length = 0;
+    damageNumbers.length = 0;
+
+    // Reset game state
+    game.dead = false;
+    game.running = true;
+    game.paused = false;
+    game.time = 0;
+
+    // Reset level-up menu
+    levelUpMenu.active = false;
+    levelUpMenu.selectedPath = null;
+    levelUpMenu.availableAbilities = [];
+
+    // Regenerate terrain and spawn enemies
+    generateTerrain();
+    for (let i = 0; i < 5; i++) spawnEnemy();
+
+    showMessage('PROCESS RESTARTED', 2000);
+}
+
+// Render level-up menu overlay
+// Store button bounds for touch detection
+const levelUpButtons = {
+    paths: [], // [{x, y, width, height, pathId}, ...]
+    abilities: [], // [{x, y, width, height, index}, ...]
+    backButton: { x: 0, y: 0, width: 0, height: 0 }
+};
+
+function renderLevelUpMenu() {
+    // Semi-transparent overlay
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
+    ctx.fillRect(0, 0, game.width, game.height);
+
+    const centerX = game.width / 2;
+    const centerY = game.height / 2;
+    const isMobile = game.width < 500;
+
+    // Title
+    ctx.font = isMobile ? 'bold 24px Orbitron, monospace' : 'bold 32px Orbitron, monospace';
     ctx.fillStyle = COLORS.cyan;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowColor = COLORS.cyan;
     ctx.shadowBlur = 20;
-    ctx.fillText(`LEVEL ${player.level}`, centerX, centerY - 200);
+    ctx.fillText(`LEVEL ${player.level}`, centerX, isMobile ? 60 : centerY - 200);
 
-    ctx.font = '18px Orbitron, monospace';
+    ctx.font = isMobile ? '14px Orbitron, monospace' : '18px Orbitron, monospace';
     ctx.shadowBlur = 10;
-    ctx.fillText(`Skill Points: ${player.skillPoints}`, centerX, centerY - 160);
+    ctx.fillText(`Skill Points: ${player.skillPoints}`, centerX, isMobile ? 90 : centerY - 160);
+
+    // Clear button storage
+    levelUpButtons.paths = [];
+    levelUpButtons.abilities = [];
 
     if (levelUpMenu.selectedPath === null) {
         // Show path selection
-        ctx.font = '20px Orbitron, monospace';
-        ctx.fillText('Choose a path:', centerX, centerY - 100);
+        ctx.font = isMobile ? '16px Orbitron, monospace' : '20px Orbitron, monospace';
+        ctx.fillText('Choose a path:', centerX, isMobile ? 120 : centerY - 100);
 
         const paths = ['bash', 'ping', 'init'];
-        const pathWidth = 200;
-        const startX = centerX - pathWidth * 1.5;
 
-        paths.forEach((pathId, i) => {
-            const path = SKILL_TREE[pathId];
-            const x = startX + i * pathWidth + pathWidth / 2;
-            const y = centerY;
+        if (isMobile) {
+            // Vertical layout for mobile
+            const boxHeight = 70;
+            const boxWidth = Math.min(280, game.width - 40);
+            const startY = 150;
 
-            // Path box
-            ctx.strokeStyle = path.color;
-            ctx.lineWidth = 2;
-            ctx.shadowColor = path.color;
-            ctx.shadowBlur = 15;
-            ctx.strokeRect(x - 80, y - 60, 160, 120);
+            paths.forEach((pathId, i) => {
+                const path = SKILL_TREE[pathId];
+                const x = centerX - boxWidth / 2;
+                const y = startY + i * (boxHeight + 15);
 
-            ctx.fillStyle = `${path.color}22`;
-            ctx.fillRect(x - 80, y - 60, 160, 120);
+                // Store for touch detection
+                levelUpButtons.paths.push({ x, y, width: boxWidth, height: boxHeight, pathId });
 
-            // Path name
-            ctx.font = 'bold 24px Orbitron, monospace';
-            ctx.fillStyle = path.color;
-            ctx.fillText(path.name, x, y - 25);
+                // Path box
+                ctx.strokeStyle = path.color;
+                ctx.lineWidth = 2;
+                ctx.shadowColor = path.color;
+                ctx.shadowBlur = 15;
+                ctx.strokeRect(x, y, boxWidth, boxHeight);
+                ctx.fillStyle = `${path.color}22`;
+                ctx.fillRect(x, y, boxWidth, boxHeight);
 
-            // Key hint
-            ctx.font = '16px monospace';
-            ctx.fillStyle = COLORS.white;
-            ctx.fillText(`[${i + 1}]`, x, y + 10);
+                // Path name
+                ctx.font = 'bold 20px Orbitron, monospace';
+                ctx.fillStyle = path.color;
+                ctx.fillText(path.name, centerX, y + 25);
 
-            // Description
-            ctx.font = '12px monospace';
-            ctx.fillText(path.description.split(' - ')[0], x, y + 35);
-        });
+                // Description
+                ctx.font = '12px monospace';
+                ctx.fillStyle = COLORS.white;
+                ctx.fillText(path.description.split(' - ')[0], centerX, y + 50);
+            });
+        } else {
+            // Horizontal layout for desktop
+            const pathWidth = 200;
+            const startX = centerX - pathWidth * 1.5;
+
+            paths.forEach((pathId, i) => {
+                const path = SKILL_TREE[pathId];
+                const x = startX + i * pathWidth + pathWidth / 2;
+                const y = centerY;
+
+                // Store for touch detection
+                levelUpButtons.paths.push({ x: x - 80, y: y - 60, width: 160, height: 120, pathId });
+
+                // Path box
+                ctx.strokeStyle = path.color;
+                ctx.lineWidth = 2;
+                ctx.shadowColor = path.color;
+                ctx.shadowBlur = 15;
+                ctx.strokeRect(x - 80, y - 60, 160, 120);
+                ctx.fillStyle = `${path.color}22`;
+                ctx.fillRect(x - 80, y - 60, 160, 120);
+
+                // Path name
+                ctx.font = 'bold 24px Orbitron, monospace';
+                ctx.fillStyle = path.color;
+                ctx.fillText(path.name, x, y - 25);
+
+                // Key hint
+                ctx.font = '16px monospace';
+                ctx.fillStyle = COLORS.white;
+                ctx.fillText(`[${i + 1}]`, x, y + 10);
+
+                // Description
+                ctx.font = '12px monospace';
+                ctx.fillText(path.description.split(' - ')[0], x, y + 35);
+            });
+        }
     } else {
         // Show abilities for selected path
         const path = SKILL_TREE[levelUpMenu.selectedPath];
 
-        ctx.font = 'bold 24px Orbitron, monospace';
+        ctx.font = isMobile ? 'bold 20px Orbitron, monospace' : 'bold 24px Orbitron, monospace';
         ctx.fillStyle = path.color;
-        ctx.fillText(`${path.name} Abilities`, centerX, centerY - 100);
+        ctx.fillText(`${path.name} Abilities`, centerX, isMobile ? 120 : centerY - 100);
 
+        // Back button
+        const backY = isMobile ? 150 : centerY - 70;
         ctx.font = '14px monospace';
         ctx.fillStyle = COLORS.white;
-        ctx.fillText('[ESC] Go back', centerX, centerY - 70);
+        ctx.fillText('← TAP HERE TO GO BACK', centerX, backY);
+        levelUpButtons.backButton = { x: centerX - 120, y: backY - 15, width: 240, height: 30 };
 
         if (levelUpMenu.availableAbilities.length === 0) {
             ctx.font = '16px monospace';
             ctx.fillStyle = COLORS.yellow;
-            ctx.fillText('No abilities available (need prerequisites)', centerX, centerY);
+            ctx.fillText('No abilities available', centerX, centerY);
+            ctx.fillText('(need prerequisites)', centerX, centerY + 25);
         } else {
+            const boxWidth = Math.min(380, game.width - 30);
+            const boxHeight = 60; // Larger touch target
+            const startY = isMobile ? 190 : centerY - 30;
+
             levelUpMenu.availableAbilities.forEach((ability, i) => {
-                const y = centerY - 30 + i * 50;
+                const y = startY + i * (boxHeight + 10);
+                const x = centerX - boxWidth / 2;
+
+                // Store for touch detection
+                levelUpButtons.abilities.push({ x, y, width: boxWidth, height: boxHeight, index: i });
 
                 // Ability box
                 ctx.strokeStyle = path.color;
                 ctx.lineWidth = 2;
                 ctx.shadowColor = path.color;
                 ctx.shadowBlur = 10;
-                ctx.strokeRect(centerX - 200, y - 18, 400, 40);
+                ctx.strokeRect(x, y, boxWidth, boxHeight);
+                ctx.fillStyle = `${path.color}15`;
+                ctx.fillRect(x, y, boxWidth, boxHeight);
 
-                // Key
-                ctx.font = 'bold 16px monospace';
-                ctx.fillStyle = COLORS.cyan;
-                ctx.textAlign = 'left';
-                ctx.fillText(`[${i + 1}]`, centerX - 180, y + 5);
-
-                // Name
-                ctx.font = 'bold 16px Orbitron, monospace';
+                // Name (larger, centered)
+                ctx.font = 'bold 18px Orbitron, monospace';
                 ctx.fillStyle = path.color;
-                ctx.fillText(ability.name, centerX - 140, y + 5);
-
-                // Description
-                ctx.font = '14px monospace';
-                ctx.fillStyle = COLORS.white;
-                ctx.fillText(ability.desc, centerX - 40, y + 5);
-
                 ctx.textAlign = 'center';
+                ctx.fillText(ability.name, centerX, y + 22);
+
+                // Description (smaller, below name)
+                ctx.font = '12px monospace';
+                ctx.fillStyle = COLORS.white;
+                ctx.fillText(ability.desc, centerX, y + 45);
             });
         }
     }
 
-    // Show unlocked abilities
+    // Show unlocked abilities at bottom
     if (player.unlockedAbilities.length > 0) {
-        ctx.font = '14px monospace';
+        ctx.font = '12px monospace';
         ctx.fillStyle = COLORS.green;
         ctx.textAlign = 'center';
-        ctx.fillText(`Unlocked: ${player.unlockedAbilities.join(', ')}`, centerX, centerY + 180);
+        ctx.fillText(`Unlocked: ${player.unlockedAbilities.join(', ')}`, centerX, game.height - 30);
     }
 
     ctx.shadowBlur = 0;
