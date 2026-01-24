@@ -913,19 +913,19 @@ function update() {
             continue;
         }
 
-        // Bounce off walls (ssh -p ability)
+        // Bounce off world edges (ssh -p ability)
         if (a.bounces && a.bounces > 0) {
-            if (a.x < 0 || a.x > game.width) {
+            if (a.x < 0 || a.x > game.worldWidth) {
                 a.vx = -a.vx;
                 a.bounces--;
-                a.x = Math.max(0, Math.min(game.width, a.x));
+                a.x = Math.max(0, Math.min(game.worldWidth, a.x));
             }
-            if (a.y < 0 || a.y > game.height) {
+            if (a.y < 0 || a.y > game.worldHeight) {
                 a.vy = -a.vy;
                 a.bounces--;
-                a.y = Math.max(0, Math.min(game.height, a.y));
+                a.y = Math.max(0, Math.min(game.worldHeight, a.y));
             }
-        } else if (a.x < 0 || a.x > game.width || a.y < 0 || a.y > game.height) {
+        } else if (a.x < 0 || a.x > game.worldWidth || a.y < 0 || a.y > game.worldHeight) {
             attacks.splice(i, 1);
             continue;
         }
