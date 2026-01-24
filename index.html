@@ -40,12 +40,12 @@
         </div>
         <div id="message-box"></div>
     </div>
-    <script src="game.js?v=5"></script>
+    <script src="game.js?v=6"></script>
     <script>
         // Register service worker for PWA
         if ('serviceWorker' in navigator) {
             window.addEventListener('load', () => {
-                navigator.serviceWorker.register('/service-worker.js')
+                navigator.serviceWorker.register('./service-worker.js')
                     .then(reg => console.log('Service Worker registered'))
                     .catch(err => console.log('Service Worker registration failed:', err));
             });

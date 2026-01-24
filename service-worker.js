@@ -1,11 +1,12 @@
-const CACHE_NAME = 'cron-game-v1';
+const CACHE_NAME = 'cron-game-v2';
 const urlsToCache = [
-    '/',
-    '/index.html',
-    '/style.css',
-    '/game.js',
-    '/icon-192.png',
-    '/icon-512.png'
+    './',
+    './index.html',
+    './style.css',
+    './game.js',
+    './icon-192.png',
+    './icon-512.png',
+    './manifest.json'
 ];
 
 // Install service worker and cache assets
