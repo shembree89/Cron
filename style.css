@@ -1,0 +1,154 @@
+/* TRON-style dark cyberpunk aesthetic */
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    --cyan: #00ffff;
+    --cyan-dim: #00aaaa;
+    --magenta: #ff00ff;
+    --orange: #ff6600;
+    --green: #00ff00;
+    --gold: #ffd700;
+    --copper: #b87333;
+    --dark-bg: #050a08;
+    --pcb-green: #1a472a;
+    --grid-color: #0d2818;
+    --glow-cyan: 0 0 10px #00ffff, 0 0 20px #00ffff, 0 0 30px #00ffff;
+    --glow-magenta: 0 0 10px #ff00ff, 0 0 20px #ff00ff, 0 0 30px #ff00ff;
+    --glow-green: 0 0 10px #00ff00, 0 0 20px #00ff00;
+}
+
+body {
+    background: var(--dark-bg);
+    font-family: 'Orbitron', monospace;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+#game-container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+}
+
+#game-canvas {
+    display: block;
+    width: 100%;
+    height: 100%;
+    background: var(--dark-bg);
+    touch-action: none;
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+}
+
+#ui-overlay {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    padding: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    pointer-events: none;
+}
+
+#stats {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.stat {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+
+.stat-label {
+    color: var(--cyan);
+    font-size: 14px;
+    text-shadow: var(--glow-cyan);
+    min-width: 40px;
+}
+
+.stat-bar {
+    width: 150px;
+    height: 12px;
+    background: rgba(0, 255, 255, 0.1);
+    border: 1px solid var(--cyan-dim);
+    position: relative;
+}
+
+.stat-fill {
+    height: 100%;
+    transition: width 0.3s ease;
+}
+
+.stat-fill.health {
+    background: linear-gradient(90deg, #00ff00, #00ffaa);
+    box-shadow: 0 0 10px #00ff00;
+    width: 100%;
+}
+
+.stat-fill.stamina {
+    background: linear-gradient(90deg, #ffaa00, #ffff00);
+    box-shadow: 0 0 10px #ffaa00;
+    width: 100%;
+}
+
+#xp-counter {
+    color: var(--magenta);
+    font-size: 16px;
+    text-shadow: var(--glow-magenta);
+}
+
+#zone-name {
+    color: var(--cyan);
+    font-size: 24px;
+    text-shadow: var(--glow-cyan);
+    letter-spacing: 4px;
+}
+
+#message-box {
+    position: absolute;
+    bottom: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: var(--cyan);
+    font-size: 14px;
+    text-shadow: var(--glow-cyan);
+    text-align: center;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+    pointer-events: none;
+}
+
+#message-box.visible {
+    opacity: 1;
+}
+
+/* Scanline effect overlay */
+#game-container::after {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: repeating-linear-gradient(0deg,
+            rgba(0, 0, 0, 0.1) 0px,
+            rgba(0, 0, 0, 0.1) 1px,
+            transparent 1px,
+            transparent 2px);
+    pointer-events: none;
+}

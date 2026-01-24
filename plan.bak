@@ -1,0 +1,79 @@
+# Cron
+A top-down, 2D, action-rpg set inside a computer system, based on real elements of a linux computer system. Cron is the main boss enemy. Lesser enemies include zombie processes among others.
+
+## Player
+
+### Player Stats
+- ROM (Health)
+- RAM (Stamina)
+- CPU (Power) [I want to have something to do with multiple cores]
+- Bandwidth (Speed)
+- PID (XP)
+- $PATH [moveset, or skill tree, I'm not sure]
+
+
+
+### Considerations for Player backstory
+- The player is an AI that is being instructed by a human user to fix their computer. The player is instructed they have an "MCP server" with access to "Tool calling" (attacks/abilities).
+- The player is an orphan process. The kernel [might be something better than kernel] has found the orphan process and has given it a purpose, to stop Cron. Cron was what killed it's parent process.
+
+### Builds
+
+#### Melee [needs a linux pun name]
+Melee is a build that focuses on close combat. This build will require the most player input during combat, focusing on quick reflexes and timing.
+
+#### Ranged [needs a linux pun name]
+Ranged is a build that focuses on long-range combat and stealth. This build will have modest input during combat, focusing on accuracy and precision. It will be geared towards players who prefer to plan and strategize.
+
+#### AoE/Summoner [needs a linux pun name]
+Summoner is a build that focuses on spawning sub processes to fight and has AoE damage. This build will be geared towards new players with very little input required during combat. [It will play almost like Brotato, where the user just needs to move around with auto attacks]
+
+### Attacks/Abilities
+Called commands, based off of real linux commands.
+- sudo (makes an attack take longer, but makes it more powerful)
+- rm (basic attack, can be upgraded with -f for more damage (melee), or -r for ranged damage, or -v for AoE damage)
+- cd (teleport, can be upgraded with -L, -P, or -e)
+- mv (repels enemy, -f melee upgrade for added damage, -t ranged upgrade for further repel range, -v AoE upgrade to repel all enemies)
+
+## NPCs/Enemies
+Enemies drop their PID (XP) when defeated.
+
+### Zombie Process
+Zombie processes are the most common enemy in the game. They are slow and easy to kill, but they can be numerous and require quick reflexes to avoid.
+
+### Daemons
+Individuals can be good or bad, maybe even start good and turn bad or vice versa.
+
+### Orphan Process
+These are the NPCs that the player can interact with. They often need help or to be saved.
+
+### Popular programs
+An assortment of NPCs or enemies based off of popular linux programs.
+
+## Levels
+The world should work like a directory structure. Starting in the users home directory. It can be "open world" where you can visit anywhere (but some places require elevated permission).
+
+### /etc/
+This can be like a store or market style place
+
+### /opt/
+
+### /root/
+
+### /dev/
+
+### /var/
+
+### other directories
+
+## Misc things I'm not sure how to incorporate
+- scripts
+- shells
+- other commands (cp, ls, pwd, mkdir, touch, grep, cat, ps, kill, pkill, chmod, chown, ping, curl/wget, man, etc... )
+- file type extensions
+- other operating systems
+- package managers [move tutors?]
+- networking
+- hacking
+- viruses, worms, malware
+- security software

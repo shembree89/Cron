@@ -1,0 +1,24 @@
+{
+    "name": "Cron - The Process Wars",
+    "short_name": "Cron",
+    "description": "A top-down action game set inside a Linux system",
+    "start_url": "/",
+    "display": "fullscreen",
+    "orientation": "any",
+    "background_color": "#050a08",
+    "theme_color": "#00ffff",
+    "icons": [
+        {
+            "src": "icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ]
+}

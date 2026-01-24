@@ -1,0 +1,11 @@
+# Ignore test files
+touchtest.html
+
+# Ignore editor/OS files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Ignore node_modules if added later
+node_modules/
