@@ -31,12 +31,21 @@ const COLORS = {
 const game = {
     width: 0,
     height: 0,
+    worldWidth: 2400,   // World is larger than screen
+    worldHeight: 2400,
     running: true,
     paused: false, // For level-up menu
     dead: false,   // Player is dead
     lastTime: 0,
     deltaTime: 0,
     time: 0
+};
+
+// Camera that follows player
+const camera = {
+    x: 0,
+    y: 0,
+    smoothing: 0.1  // How smoothly camera follows (0 = instant, 1 = never)
 };
 
 // XP milestones for leveling up
@@ -454,43 +463,45 @@ function generateBlocks() {
     blocks = [];
     const bs = BLOCK_SIZE;
     const margin = 80;
+    const w = game.worldWidth;
+    const h = game.worldHeight;
 
     // Snap helper - align to grid
     const snap = (val) => Math.round(val / bs) * bs;
 
     // Create room boundaries (outer walls)
     // Top wall with gap
-    for (let x = margin; x < game.width - margin; x += bs) {
-        if (x < game.width / 2 - bs * 2 || x > game.width / 2 + bs * 2) {
+    for (let x = margin; x < w - margin; x += bs) {
+        if (x < w / 2 - bs * 2 || x > w / 2 + bs * 2) {
             addBlock(snap(x), snap(margin));
         }
     }
     // Bottom wall with gap
-    for (let x = margin; x < game.width - margin; x += bs) {
-        if (x < game.width / 2 - bs * 2 || x > game.width / 2 + bs * 2) {
-            addBlock(snap(x), snap(game.height - margin - bs));
+    for (let x = margin; x < w - margin; x += bs) {
+        if (x < w / 2 - bs * 2 || x > w / 2 + bs * 2) {
+            addBlock(snap(x), snap(h - margin - bs));
         }
     }
     // Left wall with gap
-    for (let y = margin; y < game.height - margin; y += bs) {
-        if (y < game.height / 2 - bs * 2 || y > game.height / 2 + bs * 2) {
+    for (let y = margin; y < h - margin; y += bs) {
+        if (y < h / 2 - bs * 2 || y > h / 2 + bs * 2) {
             addBlock(snap(margin), snap(y));
         }
     }
     // Right wall with gap
-    for (let y = margin; y < game.height - margin; y += bs) {
-        if (y < game.height / 2 - bs * 2 || y > game.height / 2 + bs * 2) {
-            addBlock(snap(game.width - margin - bs), snap(y));
+    for (let y = margin; y < h - margin; y += bs) {
+        if (y < h / 2 - bs * 2 || y > h / 2 + bs * 2) {
+            addBlock(snap(w - margin - bs), snap(y));
         }
     }
 
     // Internal corridors - horizontal
-    const corridorY = snap(game.height / 2);
-    for (let x = margin + bs * 3; x < game.width / 2 - bs * 4; x += bs) {
+    const corridorY = snap(h / 2);
+    for (let x = margin + bs * 3; x < w / 2 - bs * 4; x += bs) {
         addBlock(snap(x), corridorY - bs * 2);
         addBlock(snap(x), corridorY + bs * 2);
     }
-    for (let x = game.width / 2 + bs * 4; x < game.width - margin - bs * 3; x += bs) {
+    for (let x = w / 2 + bs * 4; x < w - margin - bs * 3; x += bs) {
         addBlock(snap(x), corridorY - bs * 2);
         addBlock(snap(x), corridorY + bs * 2);
     }
@@ -503,30 +514,30 @@ function generateBlocks() {
     addBlock(snap(margin + bs * 6), snap(margin + bs * 4));
 
     // Top-right room
-    addBlock(snap(game.width - margin - bs * 5), snap(margin + bs * 3));
-    addBlock(snap(game.width - margin - bs * 6), snap(margin + bs * 3));
-    addBlock(snap(game.width - margin - bs * 7), snap(margin + bs * 3));
-    addBlock(snap(game.width - margin - bs * 7), snap(margin + bs * 4));
+    addBlock(snap(w - margin - bs * 5), snap(margin + bs * 3));
+    addBlock(snap(w - margin - bs * 6), snap(margin + bs * 3));
+    addBlock(snap(w - margin - bs * 7), snap(margin + bs * 3));
+    addBlock(snap(w - margin - bs * 7), snap(margin + bs * 4));
 
     // Bottom-left room
-    addBlock(snap(margin + bs * 4), snap(game.height - margin - bs * 4));
-    addBlock(snap(margin + bs * 5), snap(game.height - margin - bs * 4));
-    addBlock(snap(margin + bs * 6), snap(game.height - margin - bs * 4));
-    addBlock(snap(margin + bs * 6), snap(game.height - margin - bs * 5));
+    addBlock(snap(margin + bs * 4), snap(h - margin - bs * 4));
+    addBlock(snap(margin + bs * 5), snap(h - margin - bs * 4));
+    addBlock(snap(margin + bs * 6), snap(h - margin - bs * 4));
+    addBlock(snap(margin + bs * 6), snap(h - margin - bs * 5));
 
     // Bottom-right room
-    addBlock(snap(game.width - margin - bs * 5), snap(game.height - margin - bs * 4));
-    addBlock(snap(game.width - margin - bs * 6), snap(game.height - margin - bs * 4));
-    addBlock(snap(game.width - margin - bs * 7), snap(game.height - margin - bs * 4));
-    addBlock(snap(game.width - margin - bs * 7), snap(game.height - margin - bs * 5));
+    addBlock(snap(w - margin - bs * 5), snap(h - margin - bs * 4));
+    addBlock(snap(w - margin - bs * 6), snap(h - margin - bs * 4));
+    addBlock(snap(w - margin - bs * 7), snap(h - margin - bs * 4));
+    addBlock(snap(w - margin - bs * 7), snap(h - margin - bs * 5));
 
     // Some scattered blocks for variety (on grid, no overlaps)
-    for (let i = 0; i < 8; i++) {
-        const gridX = snap(margin + bs * 2 + Math.random() * (game.width - margin * 2 - bs * 4));
-        const gridY = snap(margin + bs * 2 + Math.random() * (game.height - margin * 2 - bs * 4));
+    for (let i = 0; i < 20; i++) {  // More scattered blocks for larger world
+        const gridX = snap(margin + bs * 2 + Math.random() * (w - margin * 2 - bs * 4));
+        const gridY = snap(margin + bs * 2 + Math.random() * (h - margin * 2 - bs * 4));
         // Don't place too close to center (player spawn)
-        const dx = gridX - game.width / 2;
-        const dy = gridY - game.height / 2;
+        const dx = gridX - w / 2;
+        const dy = gridY - h / 2;
         if (Math.sqrt(dx * dx + dy * dy) > bs * 3) {
             addBlock(gridX, gridY);
         }
@@ -740,13 +751,16 @@ function spawnEnemy() {
 
     let x, y;
     const side = Math.floor(Math.random() * 4);
-    const margin = 60;
+    const margin = 100;
+    const w = game.worldWidth;
+    const h = game.worldHeight;
 
+    // Spawn enemies from edges of world
     switch (side) {
-        case 0: x = Math.random() * game.width; y = -margin; break;
-        case 1: x = game.width + margin; y = Math.random() * game.height; break;
-        case 2: x = Math.random() * game.width; y = game.height + margin; break;
-        case 3: x = -margin; y = Math.random() * game.height; break;
+        case 0: x = margin + Math.random() * (w - margin * 2); y = margin; break;
+        case 1: x = w - margin; y = margin + Math.random() * (h - margin * 2); break;
+        case 2: x = margin + Math.random() * (w - margin * 2); y = h - margin; break;
+        case 3: x = margin; y = margin + Math.random() * (h - margin * 2); break;
     }
 
     enemies.push({
@@ -859,8 +873,19 @@ function update() {
         }
     }
 
-    player.x = Math.max(player.size, Math.min(game.width - player.size, player.x));
-    player.y = Math.max(player.size, Math.min(game.height - player.size, player.y));
+    // Clamp player to world bounds
+    player.x = Math.max(player.size, Math.min(game.worldWidth - player.size, player.x));
+    player.y = Math.max(player.size, Math.min(game.worldHeight - player.size, player.y));
+
+    // Update camera to follow player (smooth follow)
+    const targetCamX = player.x - game.width / 2;
+    const targetCamY = player.y - game.height / 2;
+    camera.x += (targetCamX - camera.x) * (1 - camera.smoothing);
+    camera.y += (targetCamY - camera.y) * (1 - camera.smoothing);
+
+    // Clamp camera to world bounds
+    camera.x = Math.max(0, Math.min(game.worldWidth - game.width, camera.x));
+    camera.y = Math.max(0, Math.min(game.worldHeight - game.height, camera.y));
 
     player.stamina = Math.min(player.maxStamina, player.stamina + 20 * dt);
 
@@ -1137,11 +1162,15 @@ function update() {
 }
 
 function render() {
-    // PCB-style dark green background
+    // Clear screen (always full screen, not translated)
     ctx.fillStyle = COLORS.darkBg;
     ctx.fillRect(0, 0, game.width, game.height);
 
-    // Draw circuit board traces
+    // Save context and apply camera transform
+    ctx.save();
+    ctx.translate(-camera.x, -camera.y);
+
+    // Draw circuit board traces (now relative to camera)
     drawCircuitBoard();
 
     // Draw terrain blocks
@@ -1179,6 +1208,10 @@ function render() {
     // Draw player
     drawPlayer();
 
+    // Restore context (remove camera transform)
+    ctx.restore();
+
+    // UI elements are drawn without camera offset (screen-space)
     // Draw touch controls visual (mobile)
     if (touch.leftActive) {
         drawTouchJoystick();
@@ -1219,22 +1252,24 @@ function drawTouchJoystick() {
 
 function drawCircuitBoard() {
     const gridSize = BLOCK_SIZE;
+    const w = game.worldWidth;
+    const h = game.worldHeight;
 
     // Main grid (PCB traces)
     ctx.strokeStyle = COLORS.grid;
     ctx.lineWidth = 1;
 
-    for (let x = 0; x < game.width; x += gridSize) {
+    for (let x = 0; x < w; x += gridSize) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
-        ctx.lineTo(x, game.height);
+        ctx.lineTo(x, h);
         ctx.stroke();
     }
 
-    for (let y = 0; y < game.height; y += gridSize) {
+    for (let y = 0; y < h; y += gridSize) {
         ctx.beginPath();
         ctx.moveTo(0, y);
-        ctx.lineTo(game.width, y);
+        ctx.lineTo(w, y);
         ctx.stroke();
     }
 
@@ -1243,14 +1278,14 @@ function drawCircuitBoard() {
     ctx.lineWidth = 2;
 
     // Horizontal traces
-    for (let y = gridSize * 2; y < game.height; y += gridSize * 3) {
+    for (let y = gridSize * 2; y < h; y += gridSize * 3) {
         ctx.beginPath();
         ctx.moveTo(0, y);
-        ctx.lineTo(game.width, y);
+        ctx.lineTo(w, y);
         ctx.stroke();
 
         // Via/node points
-        for (let x = gridSize; x < game.width; x += gridSize * 2) {
+        for (let x = gridSize; x < w; x += gridSize * 2) {
             ctx.beginPath();
             ctx.arc(x, y, 3, 0, Math.PI * 2);
             ctx.fillStyle = COLORS.copper;
@@ -1259,10 +1294,10 @@ function drawCircuitBoard() {
     }
 
     // Vertical traces
-    for (let x = gridSize * 2; x < game.width; x += gridSize * 4) {
+    for (let x = gridSize * 2; x < w; x += gridSize * 4) {
         ctx.beginPath();
         ctx.moveTo(x, 0);
-        ctx.lineTo(x, game.height);
+        ctx.lineTo(x, h);
         ctx.stroke();
     }
 }
@@ -1652,8 +1687,8 @@ function restartGame() {
     game.paused = false;
 
     // Reset player
-    player.x = game.width / 2;
-    player.y = game.height / 2;
+    player.x = game.worldWidth / 2;
+    player.y = game.worldHeight / 2;
     player.health = player.maxHealth;
     player.stamina = player.maxStamina;
     player.xp = 0;
