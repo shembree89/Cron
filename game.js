@@ -1646,6 +1646,11 @@ function renderDeathScreen() {
 
 // Reset game to initial state
 function restartGame() {
+    // IMMEDIATELY clear death state - must be first!
+    game.dead = false;
+    game.running = true;
+    game.paused = false;
+
     // Reset player
     player.x = game.width / 2;
     player.y = game.height / 2;
@@ -1665,9 +1670,6 @@ function restartGame() {
     damageNumbers.length = 0;
 
     // Reset game state
-    game.dead = false;
-    game.running = true;
-    game.paused = false;
     game.time = 0;
 
     // Reset level-up menu
