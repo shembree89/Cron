@@ -1,51 +1,93 @@
-const CACHE_NAME = 'cron-game-v2';
+const CACHE_NAME = 'cron-game-v3';
+
+// Use absolute URLs resolved from the service worker location
+const BASE_PATH = self.location.pathname.replace(/\/[^\/]+$/, '/');
 const urlsToCache = [
-    './',
-    './index.html',
-    './style.css',
-    './game.js',
-    './icon-192.png',
-    './icon-512.png',
-    './manifest.json'
+    BASE_PATH,
+    BASE_PATH + 'index.html',
+    BASE_PATH + 'style.css',
+    BASE_PATH + 'game.js',
+    BASE_PATH + 'icon-192.png',
+    BASE_PATH + 'icon-512.png',
+    BASE_PATH + 'manifest.json'
 ];
 
 // Install service worker and cache assets
 self.addEventListener('install', event => {
+    console.log('Service Worker: Installing...');
     event.waitUntil(
         caches.open(CACHE_NAME)
             .then(cache => {
-                console.log('Caching game assets');
+                console.log('Service Worker: Caching files:', urlsToCache);
                 return cache.addAll(urlsToCache);
             })
-            .then(() => self.skipWaiting())
+            .then(() => {
+                console.log('Service Worker: All files cached');
+                return self.skipWaiting();
+            })
+            .catch(err => {
+                console.error('Service Worker: Cache failed:', err);
+            })
     );
 });
 
 // Activate and clean up old caches
 self.addEventListener('activate', event => {
+    console.log('Service Worker: Activating...');
     event.waitUntil(
         caches.keys().then(cacheNames => {
             return Promise.all(
                 cacheNames.map(cacheName => {
                     if (cacheName !== CACHE_NAME) {
-                        console.log('Deleting old cache:', cacheName);
+                        console.log('Service Worker: Deleting old cache:', cacheName);
                         return caches.delete(cacheName);
                     }
                 })
             );
-        }).then(() => self.clients.claim())
+        }).then(() => {
+            console.log('Service Worker: Claiming clients');
+            return self.clients.claim();
+        })
     );
 });
 
-// Serve from cache, fallback to network
+// Serve from cache first, fallback to network
 self.addEventListener('fetch', event => {
+    // Only handle same-origin requests
+    if (!event.request.url.startsWith(self.location.origin)) {
+        return;
+    }
+
     event.respondWith(
         caches.match(event.request)
-            .then(response => {
-                if (response) {
-                    return response;
+            .then(cachedResponse => {
+                if (cachedResponse) {
+                    console.log('Service Worker: Serving from cache:', event.request.url);
+                    return cachedResponse;
                 }
-                return fetch(event.request);
+
+                console.log('Service Worker: Fetching from network:', event.request.url);
+                return fetch(event.request).then(response => {
+                    // Don't cache non-successful responses
+                    if (!response || response.status !== 200 || response.type !== 'basic') {
+                        return response;
+                    }
+
+                    // Clone the response for caching
+                    const responseToCache = response.clone();
+                    caches.open(CACHE_NAME).then(cache => {
+                        cache.put(event.request, responseToCache);
+                    });
+
+                    return response;
+                });
+            })
+            .catch(err => {
+                console.error('Service Worker: Fetch failed:', err);
+                // Return cached index.html as fallback for navigation requests
+                if (event.request.mode === 'navigate') {
+                    return caches.match(BASE_PATH + 'index.html');
+                }
             })
     );
 });
