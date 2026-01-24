@@ -1592,27 +1592,34 @@ function renderDeathScreen() {
 
     const centerX = game.width / 2;
     const centerY = game.height / 2;
+    const isMobile = game.width < 500;
 
-    // Title
-    ctx.font = 'bold 36px Orbitron, monospace';
+    // Title - responsive font size
+    ctx.font = isMobile ? 'bold 24px Orbitron, monospace' : 'bold 36px Orbitron, monospace';
     ctx.fillStyle = COLORS.red;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowColor = COLORS.red;
     ctx.shadowBlur = 20;
-    ctx.fillText('PROCESS TERMINATED', centerX, centerY - 80);
+
+    if (isMobile) {
+        ctx.fillText('PROCESS', centerX, centerY - 100);
+        ctx.fillText('TERMINATED', centerX, centerY - 65);
+    } else {
+        ctx.fillText('PROCESS TERMINATED', centerX, centerY - 80);
+    }
 
     // Subtitle
-    ctx.font = '18px monospace';
+    ctx.font = isMobile ? '14px monospace' : '18px monospace';
     ctx.fillStyle = COLORS.white;
     ctx.shadowBlur = 0;
-    ctx.fillText(`PID gained: ${player.xp}`, centerX, centerY - 30);
+    ctx.fillText(`PID gained: ${player.xp}`, centerX, centerY - 20);
 
-    // Restart button
-    const btnWidth = 200;
-    const btnHeight = 60;
+    // Restart button - larger and responsive
+    const btnWidth = Math.min(280, game.width - 40);
+    const btnHeight = 70;
     const btnX = centerX - btnWidth / 2;
-    const btnY = centerY + 20;
+    const btnY = centerY + 30;
 
     // Store button bounds for touch detection
     deathRestartButton.x = btnX;
@@ -1626,11 +1633,11 @@ function renderDeathScreen() {
     ctx.shadowColor = COLORS.cyan;
     ctx.shadowBlur = 15;
     ctx.strokeRect(btnX, btnY, btnWidth, btnHeight);
-    ctx.fillStyle = 'rgba(0, 255, 255, 0.15)';
+    ctx.fillStyle = 'rgba(0, 255, 255, 0.2)';
     ctx.fillRect(btnX, btnY, btnWidth, btnHeight);
 
     // Button text
-    ctx.font = 'bold 24px Orbitron, monospace';
+    ctx.font = 'bold 28px Orbitron, monospace';
     ctx.fillStyle = COLORS.cyan;
     ctx.fillText('RESTART', centerX, btnY + btnHeight / 2);
 
