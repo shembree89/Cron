@@ -1680,6 +1680,9 @@ function restartGame() {
     for (let i = 0; i < 5; i++) spawnEnemy();
 
     showMessage('PROCESS RESTARTED', 2000);
+
+    // Restart the game loop (in case it had stopped)
+    requestAnimationFrame(gameLoop);
 }
 
 // Render level-up menu overlay
