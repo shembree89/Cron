@@ -73,33 +73,41 @@ body {
 /* Profile Button */
 #profile-btn-container {
     position: absolute;
-    bottom: 30px;
-    right: 30px;
+    bottom: 20px;
+    /* Fallback */
+    bottom: max(20px, env(safe-area-inset-bottom) + 20px);
+    right: 20px;
+    /* Fallback */
+    right: max(20px, env(safe-area-inset-right) + 20px);
+    pointer-events: auto;
+    /* Ensure clickable */
 }
 
 #profile-btn {
-    width: 60px;
-    height: 60px;
-    background: rgba(0, 20, 20, 0.8);
-    border: 2px solid var(--cyan);
-    border-radius: 50%;
+    width: auto;
+    height: auto;
+    background: transparent;
+    border: none;
     display: flex;
     justify-content: center;
     align-items: center;
     cursor: pointer;
-    box-shadow: 0 0 10px var(--cyan);
-    transition: all 0.2s;
+    transition: transform 0.2s, filter 0.2s;
+    padding: 10px;
+    /* larger tap target */
 }
 
 #profile-btn:hover {
-    box-shadow: 0 0 20px var(--cyan);
-    background: rgba(0, 50, 50, 0.9);
+    transform: scale(1.1);
+    filter: drop-shadow(0 0 10px var(--cyan));
+    background: transparent;
+    box-shadow: none;
 }
 
 #profile-btn .icon {
     color: var(--cyan);
-    width: 32px;
-    height: 32px;
+    width: 40px;
+    height: 40px;
     filter: drop-shadow(0 0 5px var(--cyan));
 }
 
