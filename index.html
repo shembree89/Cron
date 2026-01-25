@@ -18,27 +18,47 @@
     <div id="game-container">
         <canvas id="game-canvas"></canvas>
         <div id="ui-overlay">
-            <div id="stats">
-                <div class="stat">
-                    <span class="stat-label">ROM</span>
-                    <div class="stat-bar">
-                        <div id="health-bar" class="stat-fill health"></div>
-                    </div>
-                </div>
-                <div class="stat">
-                    <span class="stat-label">RAM</span>
-                    <div class="stat-bar">
-                        <div id="stamina-bar" class="stat-fill stamina"></div>
-                    </div>
-                </div>
-                <div class="stat">
-                    <span class="stat-label">PID</span>
-                    <span id="xp-counter">0</span>
+            <!-- Stats removed, replaced by Profile UI -->
+            <div id="profile-btn-container" style="pointer-events: auto;">
+                <div id="profile-btn">
+                    <span class="icon">USER</span>
                 </div>
             </div>
             <div id="zone-name">/tmp/</div>
         </div>
         <div id="message-box"></div>
+        <div id="profile-view" class="hidden">
+            <div class="profile-header">
+                <h2>PLAYER PROFILE</h2>
+                <button id="close-profile">X</button>
+            </div>
+            <div class="profile-content">
+                <div class="stat-row">
+                    <span class="label">ROM (Health)</span>
+                    <span class="value" id="profile-health">100/100</span>
+                </div>
+                <div class="stat-row">
+                    <span class="label">RAM (Stamina)</span>
+                    <span class="value" id="profile-stamina">100/100</span>
+                </div>
+                <div class="stat-row">
+                    <span class="label">PID (XP)</span>
+                    <span class="value" id="profile-xp">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="label">Bits</span>
+                    <span class="value" id="profile-bits">0</span>
+                </div>
+                <div class="stat-row">
+                    <span class="label">Bytes</span>
+                    <span class="value" id="profile-bytes">0</span>
+                </div>
+                <div class="skill-tree-section">
+                    <h3>$PATH (SKILL TREE)</h3>
+                    <div id="profile-skills-placeholder">[Skills Placeholder]</div>
+                </div>
+            </div>
+        </div>
     </div>
     <script src="game.js?v=6"></script>
     <script>

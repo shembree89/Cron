@@ -5,10 +5,20 @@ const canvas = document.getElementById('game-canvas');
 const ctx = canvas.getContext('2d');
 
 // UI Elements
-const healthBar = document.getElementById('health-bar');
-const staminaBar = document.getElementById('stamina-bar');
-const xpCounter = document.getElementById('xp-counter');
 const messageBox = document.getElementById('message-box');
+const profileView = document.getElementById('profile-view');
+const profileBtn = document.getElementById('profile-btn');
+const closeProfileBtn = document.getElementById('close-profile');
+
+// Profile UI Elements
+const uiElements = {
+    health: document.getElementById('profile-health'),
+    stamina: document.getElementById('profile-stamina'),
+    xp: document.getElementById('profile-xp'),
+    bits: document.getElementById('profile-bits'),
+    bytes: document.getElementById('profile-bytes'),
+    skills: document.getElementById('profile-skills-placeholder')
+};
 
 // Colors - Circuit board palette
 const COLORS = {
@@ -137,7 +147,8 @@ const player = {
     invulnerable: 0,
     vx: 0,
     vy: 0,
-    pulsePhase: 0
+    pulsePhase: 0,
+    profileOpen: false
 };
 
 // Level-up menu state
@@ -421,10 +432,24 @@ function init() {
     window.addEventListener('keyup', (e) => handleKey(e.key, false));
 
     canvas.addEventListener('click', (e) => {
+        // Prevent attack if clicking on UI (though overlay handles pointer events mostly)
+        if (game.paused) return;
+
         const rect = canvas.getBoundingClientRect();
         const mouseX = e.clientX - rect.left;
         const mouseY = e.clientY - rect.top;
         attack(mouseX, mouseY);
+    });
+
+    // Profile UI Listeners
+    profileBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleProfile();
+    });
+
+    closeProfileBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleProfile();
     });
 
     // Touch controls
@@ -803,6 +828,10 @@ function gameLoop(timestamp) {
     if (!game.paused) {
         update();
     }
+    // Also update profile view if open to show real-time changes (e.g. regeneration) if we decided to keep it strictly paused, this might not be needed, but good for polish
+    if (player.profileOpen) {
+        updateProfileView();
+    }
     render();
 
     // Draw level-up menu on top if active
@@ -1154,11 +1183,45 @@ function update() {
         lastSpawn = Date.now();
     }
 
-    // Update UI
-    healthBar.style.width = (player.health / player.maxHealth * 100) + '%';
-    staminaBar.style.width = (player.stamina / player.maxStamina * 100) + '%';
-    const nextLevelXP = player.level < XP_MILESTONES.length ? XP_MILESTONES[player.level] : '∞';
-    xpCounter.textContent = `Lv${player.level} | XP: ${player.xp}/${nextLevelXP} | Bits: ${player.bits} | Bytes: ${player.bytes}`;
+    // Legacy HUD removed
+}
+
+function toggleProfile() {
+    player.profileOpen = !player.profileOpen;
+
+    if (player.profileOpen) {
+        profileView.classList.remove('hidden');
+        game.paused = true;
+        updateProfileView();
+    } else {
+        profileView.classList.add('hidden');
+        game.paused = false;
+    }
+}
+
+function updateProfileView() {
+    const nextLevelXP = player.level < XP_MILESTONES.length ? XP_MILESTONES[player.level] : 'MAX';
+
+    uiElements.health.textContent = `${Math.floor(player.health)} / ${player.maxHealth}`;
+    uiElements.stamina.textContent = `${Math.floor(player.stamina)} / ${player.maxStamina}`;
+    uiElements.xp.textContent = `${player.xp} / ${nextLevelXP} (Lvl ${player.level})`;
+    uiElements.bits.textContent = player.bits;
+    uiElements.bytes.textContent = player.bytes;
+
+    // Simple skills placeholder update
+    if (player.unlockedAbilities.length > 0) {
+        uiElements.skills.innerHTML = player.unlockedAbilities.map(id => {
+            // Find ability name across all paths
+            let name = id;
+            for (const pathKey in SKILL_TREE) {
+                const found = SKILL_TREE[pathKey].abilities.find(a => a.id === id);
+                if (found) name = found.name;
+            }
+            return `<div class="skill-tag">${name}</div>`;
+        }).join('');
+    } else {
+        uiElements.skills.textContent = "No skills unlocked yet. Level up to modify $PATH.";
+    }
 }
 
 function render() {

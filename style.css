@@ -12,6 +12,7 @@
     --cyan-dim: #00aaaa;
     --magenta: #ff00ff;
     --orange: #ff6600;
+    --red: #ff3333;
     --green: #00ff00;
     --gold: #ffd700;
     --copper: #b87333;
@@ -68,48 +69,132 @@ body {
     gap: 10px;
 }
 
-.stat {
+/* Profile Button */
+#profile-btn-container {
+    position: absolute;
+    bottom: 20px;
+    right: 20px;
+}
+
+#profile-btn {
+    width: 60px;
+    height: 60px;
+    background: rgba(0, 20, 20, 0.8);
+    border: 2px solid var(--cyan);
+    border-radius: 50%;
     display: flex;
+    justify-content: center;
     align-items: center;
-    gap: 10px;
+    cursor: pointer;
+    box-shadow: 0 0 10px var(--cyan);
+    transition: all 0.2s;
 }
 
-.stat-label {
+#profile-btn:hover {
+    box-shadow: 0 0 20px var(--cyan);
+    background: rgba(0, 40, 40, 0.9);
+}
+
+#profile-btn .icon {
     color: var(--cyan);
+    font-weight: bold;
     font-size: 14px;
+}
+
+/* Profile View Modal */
+#profile-view {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    max-width: 500px;
+    background: rgba(5, 10, 8, 0.95);
+    border: 2px solid var(--cyan);
+    padding: 20px;
+    color: var(--cyan);
+    z-index: 100;
+    box-shadow: 0 0 50px rgba(0, 255, 255, 0.2);
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+#profile-view.hidden {
+    display: none;
+}
+
+.profile-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid var(--cyan-dim);
+    padding-bottom: 10px;
+}
+
+.profile-header h2 {
+    font-size: 20px;
     text-shadow: var(--glow-cyan);
-    min-width: 40px;
 }
 
-.stat-bar {
-    width: 150px;
-    height: 12px;
-    background: rgba(0, 255, 255, 0.1);
-    border: 1px solid var(--cyan-dim);
-    position: relative;
+#close-profile {
+    background: none;
+    border: 1px solid var(--red);
+    color: var(--red);
+    padding: 5px 10px;
+    cursor: pointer;
+    font-family: 'Orbitron', monospace;
 }
 
-.stat-fill {
-    height: 100%;
-    transition: width 0.3s ease;
+.profile-content {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
 }
 
-.stat-fill.health {
-    background: linear-gradient(90deg, #00ff00, #00ffaa);
-    box-shadow: 0 0 10px #00ff00;
-    width: 100%;
+.stat-row {
+    display: flex;
+    justify-content: space-between;
+    font-size: 18px;
+    border-bottom: 1px solid rgba(0, 255, 255, 0.1);
+    padding-bottom: 5px;
 }
 
-.stat-fill.stamina {
-    background: linear-gradient(90deg, #ffaa00, #ffff00);
-    box-shadow: 0 0 10px #ffaa00;
-    width: 100%;
+.stat-row .label {
+    color: var(--cyan-dim);
 }
 
-#xp-counter {
+.stat-row .value {
+    color: var(--white);
+    text-shadow: 0 0 5px var(--cyan);
+}
+
+.skill-tree-section h3 {
     color: var(--magenta);
-    font-size: 16px;
-    text-shadow: var(--glow-magenta);
+    margin-bottom: 10px;
+    font-size: 18px;
+}
+
+#profile-skills-placeholder {
+    padding: 20px;
+    border: 1px dashed var(--magenta);
+    text-align: center;
+    color: var(--magenta);
+    opacity: 0.7;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    justify-content: center;
+}
+
+.skill-tag {
+    background: rgba(255, 0, 255, 0.2);
+    border: 1px solid var(--magenta);
+    padding: 5px 10px;
+    border-radius: 4px;
+    font-size: 14px;
+    color: var(--white);
+    text-shadow: 0 0 5px var(--magenta);
 }
 
 #zone-name {
@@ -117,7 +202,12 @@ body {
     font-size: 24px;
     text-shadow: var(--glow-cyan);
     letter-spacing: 4px;
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    /* Moved to left since bars are gone */
 }
+
 
 #message-box {
     position: absolute;
