@@ -37,7 +37,7 @@ const COLORS = {
     trace: '#2a5a3a',
     darkBg: '#050a08',
     lightBlue: '#66ccff',
-    darkBlue: '#0055aa'
+    darkBlue: '#0077ff'
 };
 
 // Game state

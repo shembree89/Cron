@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cron-game-v5';
+const CACHE_NAME = 'cron-game-v6';
 
 // Use absolute URLs resolved from the service worker location
 const BASE_PATH = self.location.pathname.replace(/\/[^\/]+$/, '/');
@@ -58,15 +58,35 @@ self.addEventListener('fetch', event => {
         return;
     }
 
+    // Network First strategy for navigation requests (HTML)
+    // This ensures we always get the latest version if online
+    if (event.request.mode === 'navigate') {
+        event.respondWith(
+            fetch(event.request)
+                .then(response => {
+                    // Cache the latest version
+                    const responseToCache = response.clone();
+                    caches.open(CACHE_NAME).then(cache => {
+                        cache.put(event.request, responseToCache);
+                    });
+                    return response;
+                })
+                .catch(() => {
+                    // Fallback to cache if offline
+                    return caches.match(event.request);
+                })
+        );
+        return;
+    }
+
+    // Cache First for everything else (Assets)
     event.respondWith(
         caches.match(event.request)
             .then(cachedResponse => {
                 if (cachedResponse) {
-                    console.log('Service Worker: Serving from cache:', event.request.url);
                     return cachedResponse;
                 }
 
-                console.log('Service Worker: Fetching from network:', event.request.url);
                 return fetch(event.request).then(response => {
                     // Don't cache non-successful responses
                     if (!response || response.status !== 200 || response.type !== 'basic') {
@@ -81,13 +101,6 @@ self.addEventListener('fetch', event => {
 
                     return response;
                 });
-            })
-            .catch(err => {
-                console.error('Service Worker: Fetch failed:', err);
-                // Return cached index.html as fallback for navigation requests
-                if (event.request.mode === 'navigate') {
-                    return caches.match(BASE_PATH + 'index.html');
-                }
             })
     );
 });
