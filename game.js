@@ -1481,7 +1481,16 @@ function drawPlayer() {
         { x: s * 0.6, y: s * 0.7 }        // 5: front-bottom (right side)
     ];
 
-    // Draw health fill (left half - opacity based on health level)
+    // Draw health fill (left half, y < 0)
+    // Drains from top to bottom: full health shows full half, low health shows less
+    // The left half spans from y = -0.7s to y = 0
+    // At full health, show all of it. At low health, show only the top portion.
+    ctx.save();
+    const healthHeight = s * 0.8 * healthRatio; // How much height to show
+    ctx.beginPath();
+    ctx.rect(-s * 2, -s, s * 4, healthHeight); // Clip region: top portion
+    ctx.clip();
+
     ctx.beginPath();
     ctx.moveTo(vertices[0].x, vertices[0].y);
     ctx.lineTo(vertices[1].x, vertices[1].y);
@@ -1490,13 +1499,22 @@ function drawPlayer() {
     ctx.lineTo(0, 0);
     ctx.closePath();
     ctx.fillStyle = COLORS.red;
-    ctx.globalAlpha = healthRatio * 0.7;
+    ctx.globalAlpha = 0.7;
     ctx.fill();
+    ctx.restore();
 
     // Reset alpha
     ctx.globalAlpha = (invulnerable > 0 && Math.floor(invulnerable * 20) % 2 === 0) ? 0.4 : 1;
 
-    // Draw stamina fill (right half - opacity based on stamina level)
+    // Draw stamina fill (right half, y > 0)
+    // Drains from top to bottom: full stamina shows full half, low stamina shows less
+    // The right half spans from y = 0 to y = 0.7s
+    ctx.save();
+    const staminaHeight = s * 0.8 * staminaRatio;
+    ctx.beginPath();
+    ctx.rect(-s * 2, 0, s * 4, staminaHeight); // Clip region: top portion of right half
+    ctx.clip();
+
     ctx.beginPath();
     ctx.moveTo(vertices[0].x, vertices[0].y);
     ctx.lineTo(vertices[5].x, vertices[5].y);
@@ -1505,8 +1523,9 @@ function drawPlayer() {
     ctx.lineTo(0, 0);
     ctx.closePath();
     ctx.fillStyle = COLORS.green;
-    ctx.globalAlpha = staminaRatio * 0.7;
+    ctx.globalAlpha = 0.7;
     ctx.fill();
+    ctx.restore();
 
     // Reset alpha
     if (invulnerable > 0 && Math.floor(invulnerable * 20) % 2 === 0) {
