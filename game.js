@@ -2261,10 +2261,10 @@ function restartGame() {
 
     // Clear entities
     enemies.length = 0;
-    projectiles.length = 0;
+    attacks.length = 0; // Was projectiles
     particles.length = 0;
     pickups.length = 0;
-    damageNumbers.length = 0;
+    // damageNumbers removed as not implemented yet
 
     // Reset game state
     game.time = 0;
