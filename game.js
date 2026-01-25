@@ -1489,7 +1489,6 @@ function drawPlayer() {
     // maxCoverage: 0.0 to 1.0 (how much of the path is available to be filled - e.g. 0.85 stops short)
     function drawSolidBar(pathPoints, progress, color) {
         const barWidth = s * 0.15; // Width of the solid bar
-        const totalPathLen = 2.8 * s; // Approx length of 3 sides (actually 3*s)
 
         // We draw the "Filled" portion
         // And we draw a "Container" background
@@ -1589,20 +1588,6 @@ function drawPlayer() {
     drawSolidBar(xpPathScaled, xpProgress, '#4488ff');
     drawSolidBar(staPathScaled, staminaRatio, COLORS.green);
 
-    // === FRONT INDICATOR (Inner to Outer Connector) ===
-    // Connect Inner Hex Front to Outer Hex Front
-    const innerScale = 0.55;
-    const innerHex = hexVerts.map(v => ({ x: v.x * innerScale, y: v.y * innerScale }));
-
-    ctx.beginPath();
-    ctx.moveTo(innerHex[0].x, innerHex[0].y); // Inner Front
-    ctx.lineTo(hexVerts[0].x, hexVerts[0].y); // Outer Front
-    ctx.strokeStyle = COLORS.cyan;
-    ctx.lineWidth = 3;
-    ctx.shadowColor = COLORS.cyan;
-    ctx.shadowBlur = 10;
-    ctx.stroke();
-
     // === OUTER HEXAGON FRAME ===
     ctx.beginPath();
     ctx.moveTo(hexVerts[0].x, hexVerts[0].y);
@@ -1616,7 +1601,25 @@ function drawPlayer() {
     ctx.shadowBlur = 6;
     ctx.stroke();
 
-    // === CENTER HEALTH (Background Fill) ===
+    // === INNER SHAPE (Center Health) ===
+    // User wants: inner hex front vertex (0) intersects outer hex top vertex (0)
+    // Other vertices scaled down.
+    const innerScale = 0.70; // Larger for visibility
+    const innerHex = [];
+
+    // 0 is Front. 3 is Back.
+    for (let i = 0; i < 6; i++) {
+        if (i === 0) {
+            // Front spans all the way to outer vertex
+            innerHex.push(hexVerts[0]);
+        } else {
+            innerHex.push({
+                x: hexVerts[i].x * innerScale,
+                y: hexVerts[i].y * innerScale
+            });
+        }
+    }
+
     ctx.save();
     // Clip to inner hex
     ctx.beginPath();
@@ -1632,10 +1635,15 @@ function drawPlayer() {
     ctx.fill();
 
     // Health Fill (Drains Front-to-Back)
-    // Use the same X-based clipping logic as before
-    const fillMaxX = -s * innerScale + (2 * s * innerScale * healthRatio);
+    // Use X-axis clipping.
+    // Range is approx -s*scale (Back) to +s (Front).
+    // Total width = s + s*innerScale = s * (1 + 0.7) = 1.7s
+    const totalW = s * (1 + innerScale);
+    const backX = -s * innerScale;
+    const currentW = totalW * healthRatio;
+
     ctx.fillStyle = 'rgba(255, 0, 255, 0.5)'; // Magenta
-    ctx.fillRect(-s * innerScale, -s * innerScale, (2 * s * innerScale * healthRatio), 2 * s * innerScale);
+    ctx.fillRect(backX, -s, currentW, 2 * s); // Fill from back towards front
 
     ctx.restore();
 
