@@ -34,7 +34,10 @@ const COLORS = {
     pcbGreen: '#1a472a',
     grid: '#0d2818',
     trace: '#2a5a3a',
-    darkBg: '#050a08'
+    trace: '#2a5a3a',
+    darkBg: '#050a08',
+    lightBlue: '#66ccff',
+    darkBlue: '#0055aa'
 };
 
 // Game state
@@ -1648,8 +1651,8 @@ function drawPlayer() {
     const staPathScaled = staPath.map(scalePt);
 
     // Draw Bars
-    drawSolidBar(xpPathScaled, xpProgress, '#4488ff');
-    drawSolidBar(staPathScaled, staminaRatio, COLORS.green);
+    drawSolidBar(xpPathScaled, xpProgress, COLORS.darkBlue);
+    drawSolidBar(staPathScaled, staminaRatio, COLORS.lightBlue);
 
     // === OUTER HEXAGON FRAME ===
     ctx.beginPath();
