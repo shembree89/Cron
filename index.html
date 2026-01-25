@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Cron - The Process Wars</title>
-    <link rel="stylesheet" href="style.css?v=15">
+    <link rel="stylesheet" href="style.css?v=16">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
 </head>
@@ -31,6 +31,43 @@
             <div id="zone-name">/tmp/</div>
         </div>
         <div id="message-box"></div>
+        <div id="intro-overlay" class="hidden">
+            <div id="intro-dialog">
+                <div id="kernel-avatar">
+                    <svg viewBox="0 0 24 24" width="64" height="64" fill="var(--green)">
+                        <path
+                            d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-1-13h2v6h-2zm0 8h2v2h-2z" />
+                    </svg>
+                </div>
+                <div id="intro-text"></div>
+                <div id="intro-controls">
+                    <button id="skip-intro" class="ui-btn secondary">SKIP</button>
+                    <button id="next-intro" class="ui-btn primary">NEXT >></button>
+                </div>
+            </div>
+        </div>
+
+        <div id="class-selection" class="hidden">
+            <h2>SELECT YOUR BUILD</h2>
+            <div class="class-cards">
+                <div class="class-card" data-class="bash">
+                    <h3>BASH</h3>
+                    <p class="role">Melee (High Risk)</p>
+                    <p class="desc">Aggressive close combat. High damage but requires timing and reflexes.</p>
+                </div>
+                <div class="class-card" data-class="ping">
+                    <h3>PING</h3>
+                    <p class="role">Ranged (Precision)</p>
+                    <p class="desc">Long-range attacks. Focus on positioning and accuracy.</p>
+                </div>
+                <div class="class-card" data-class="init">
+                    <h3>INIT</h3>
+                    <p class="role">Summoner (AoE)</p>
+                    <p class="desc">Area control and minions. Manage the battlefield.</p>
+                </div>
+            </div>
+        </div>
+
         <div id="profile-view" class="hidden">
             <div class="profile-header">
                 <h2>PLAYER PROFILE</h2>
@@ -64,7 +101,7 @@
             </div>
         </div>
     </div>
-    <script src="game.js?v=15"></script>
+    <script src="game.js?v=16"></script>
     <script>
         // Register service worker for PWA
         if ('serviceWorker' in navigator) {

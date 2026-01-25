@@ -252,3 +252,144 @@ body {
             transparent 2px);
     pointer-events: none;
 }
+/* Intro Overlay */
+#intro-overlay, #class-selection {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(5, 10, 8, 0.95);
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    z-index: 200;
+}
+
+#intro-overlay.hidden, #class-selection.hidden {
+    display: none;
+}
+
+#intro-dialog {
+    background: rgba(0, 20, 16, 0.9);
+    border: 2px solid var(--green);
+    padding: 40px;
+    width: 90%;
+    max-width: 600px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 20px;
+    box-shadow: var(--glow-green);
+    animation: terminal-flicker 0.15s infinite;
+}
+
+#intro-text {
+    font-size: 18px;
+    line-height: 1.6;
+    color: var(--green);
+    text-shadow: 0 0 5px var(--green);
+    min-height: 80px;
+    text-align: left;
+    width: 100%;
+}
+
+#intro-controls {
+    display: flex;
+    justify-content: space-between;
+    width: 100%;
+    margin-top: 20px;
+}
+
+/* Class Selection */
+#class-selection {
+    flex-direction: column;
+    gap: 40px;
+    background: var(--dark-bg);
+}
+
+#class-selection h2 {
+    color: var(--cyan);
+    font-size: 32px;
+    text-shadow: var(--glow-cyan);
+}
+
+.class-cards {
+    display: flex;
+    gap: 30px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.class-card {
+    background: rgba(0, 40, 40, 0.6);
+    border: 2px solid var(--cyan-dim);
+    padding: 30px;
+    width: 250px;
+    cursor: pointer;
+    transition: all 0.3s;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    text-align: center;
+}
+
+.class-card:hover {
+    transform: translateY(-10px);
+    border-color: var(--cyan);
+    box-shadow: var(--glow-cyan);
+}
+
+.class-card h3 {
+    color: var(--white);
+    font-size: 24px;
+}
+
+.class-card .role {
+    color: var(--magenta);
+    font-weight: bold;
+}
+
+.class-card .desc {
+    color: var(--cyan-dim);
+    font-size: 14px;
+    line-height: 1.4;
+}
+
+/* UI Buttons */
+.ui-btn {
+    padding: 10px 20px;
+    border: none;
+    font-family: 'Orbitron', monospace;
+    font-size: 16px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-transform: uppercase;
+}
+
+.ui-btn.primary {
+    background: var(--green);
+    color: var(--dark-bg);
+    box-shadow: 0 0 10px var(--green);
+}
+
+.ui-btn.primary:hover {
+    background: #4dff4d;
+    transform: scale(1.05);
+}
+
+.ui-btn.secondary {
+    background: transparent;
+    border: 1px solid var(--green);
+    color: var(--green);
+}
+
+.ui-btn.secondary:hover {
+    background: rgba(0, 255, 0, 0.1);
+}
+
+@keyframes terminal-flicker {
+    0% { opacity: 0.97; }
+    50% { opacity: 1; }
+    100% { opacity: 0.98; }
+}

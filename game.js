@@ -139,6 +139,7 @@ const player = {
     xp: 0,
     level: 1,
     skillPoints: 0,
+    subclass: null, // 'bash', 'ping', 'init'
     unlockedAbilities: [], // Array of ability IDs
     bits: 0,
     bytes: 0,
@@ -153,6 +154,16 @@ const player = {
     pulsePhase: 0,
     profileOpen: false
 };
+
+// Game State
+let gameState = 'INTRO'; // INTRO, SELECT, PLAYING
+let introStep = 0;
+const INTRO_TEXTS = [
+    "System critical... Kernel panic imminent...",
+    "Cron has corrupted the job scheduler. Processes are going rogue across the entire system.",
+    "I have isolated you—an orphan process—from the purge. You are the last hope to restore order.",
+    "I can grant you access to one of three execution protocols. Choose your path wisely."
+];
 
 // Level-up menu state
 let levelUpMenu = {
@@ -205,6 +216,32 @@ const touch = {
 };
 
 function setupTouchControls() {
+    canvas.addEventListener('touchstart', handleTouchStart, { passive: false });
+    canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
+    canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
+
+    // UI Event Listeners for Intro/Class Selection
+    const skipBtn = document.getElementById('skip-intro');
+    if (skipBtn) {
+        skipBtn.addEventListener('click', () => {
+            gameState = 'SELECT';
+            document.getElementById('intro-overlay').classList.add('hidden');
+            document.getElementById('class-selection').classList.remove('hidden');
+        });
+    }
+
+    const nextBtn = document.getElementById('next-intro');
+    if (nextBtn) {
+        nextBtn.addEventListener('click', advanceIntro);
+    }
+
+    document.querySelectorAll('.class-card').forEach(card => {
+        card.addEventListener('click', (e) => {
+            const build = card.getAttribute('data-class');
+            selectClass(build);
+        });
+    });
+
     // Using Touch Events - confirmed working on Android Chrome
 
     canvas.addEventListener('touchstart', function (e) {
@@ -228,6 +265,8 @@ function setupTouchControls() {
             handleLevelUpMenuTap(x, y);
             return; // Don't process as game input
         }
+
+        if (gameState !== 'PLAYING') return;
 
         for (let i = 0; i < e.touches.length; i++) {
             const t = e.touches[i];
@@ -311,6 +350,38 @@ function setupTouchControls() {
         touch.rightId = null;
         keys.left = keys.right = keys.up = keys.down = false;
     });
+}
+
+function advanceIntro() {
+    introStep++;
+    const textEl = document.getElementById('intro-text');
+
+    // Stop any existing typing
+    if (window.typeTimeout) clearTimeout(window.typeTimeout);
+
+    if (introStep < INTRO_TEXTS.length) {
+        textEl.innerText = "";
+        typeWriter(INTRO_TEXTS[introStep], textEl);
+    } else {
+        gameState = 'SELECT';
+        document.getElementById('intro-overlay').classList.add('hidden');
+        document.getElementById('class-selection').classList.remove('hidden');
+    }
+}
+
+function typeWriter(text, element, i = 0) {
+    if (gameState !== 'INTRO') return;
+    if (i < text.length) {
+        element.innerHTML += text.charAt(i);
+        window.typeTimeout = setTimeout(() => typeWriter(text, element, i + 1), 30);
+    }
+}
+
+function selectClass(build) {
+    player.subclass = build;
+    gameState = 'PLAYING';
+    document.getElementById('class-selection').classList.add('hidden');
+    showMessage(`Protocol ${build.toUpperCase()} Loaded.`, 3000);
 }
 
 // Handle taps on the level-up menu
@@ -477,6 +548,10 @@ function init() {
         showMessage('WASD to move | SPACE or Click to attack | Collect Bits & Bytes', 4000);
     }
 
+    // Start Intro
+    document.getElementById('intro-overlay').classList.remove('hidden');
+    typeWriter(INTRO_TEXTS[0], document.getElementById('intro-text'));
+
     requestAnimationFrame(gameLoop);
 }
 
@@ -588,8 +663,8 @@ function addBlock(x, y) {
 }
 
 function handleKey(key, pressed) {
-    // Handle level-up menu
-    if (levelUpMenu.active && pressed) {
+    // Handle level-up menu (only if playing but paused for menu)
+    if (gameState === 'PLAYING' && levelUpMenu.active && pressed) {
         if (levelUpMenu.selectedPath === null) {
             // Select a path
             if (key === '1') selectPath('bash');
@@ -608,6 +683,8 @@ function handleKey(key, pressed) {
         }
         return;
     }
+
+    if (gameState !== 'PLAYING') return;
 
     switch (key.toLowerCase()) {
         case 'w': case 'arrowup': keys.up = pressed; break;
@@ -710,8 +787,17 @@ function getPlayerStats() {
 }
 
 function attack(targetX, targetY) {
+    // If no subclass selected yet (shouldn't happen in playing state), default to Ping
+    const build = player.subclass || 'ping';
     const stats = getPlayerStats();
-    const staminaCost = hasAbility('sudo-bash') ? 20 : 10;
+
+    // Different costs/logic per build
+    let staminaCost = 10;
+    if (build === 'bash') staminaCost = 15;
+    if (build === 'init') staminaCost = 25;
+
+    // Sudo mode doubles cost
+    if (hasAbility('sudo-bash')) staminaCost *= 2;
 
     if (player.attackCooldown > 0 || player.stamina < staminaCost) return;
 
@@ -719,45 +805,81 @@ function attack(targetX, targetY) {
     player.attackCooldown = stats.attackSpeed;
     player.attacking = true;
     player.attackDuration = 0.15;
+
+    // Calculate angle
     player.attackAngle = Math.atan2(targetY - player.y, targetX - player.x);
 
-    // Create data packet projectile(s)
-    if (stats.coneAttack) {
-        // rm -rf: Fire 3 projectiles in a cone
-        for (let i = -1; i <= 1; i++) {
-            const spreadAngle = player.attackAngle + i * 0.25;
+    // --- BASH (MELEE) ---
+    if (build === 'bash') {
+        // Melee slash - short range, wide arc
+        const slashRange = 60;
+        attacks.push({
+            x: player.x,
+            y: player.y,
+            vx: Math.cos(player.attackAngle) * 50, // Slight forward movement of slash
+            vy: Math.sin(player.attackAngle) * 50,
+            life: 0.2, // Short life
+            size: slashRange,
+            type: 'slash', // New type to handle in update
+            damage: stats.damage * 1.5, // Higher base damage
+            angle: player.attackAngle,
+            arc: Math.PI / 2, // 90 degree arc
+            pierce: 999 // Infinite pierce for melee
+        });
+
+        // Visual effect
+        createSlashEffect(player.x, player.y, player.attackAngle, slashRange);
+    }
+
+    // --- INIT (AoE) ---
+    else if (build === 'init') {
+        // AoE Burst around player
+        const radius = 100;
+        attacks.push({
+            x: player.x,
+            y: player.y,
+            vx: 0, vy: 0,
+            life: 0.3,
+            size: radius,
+            type: 'burst',
+            damage: stats.damage * 0.8,
+            pierce: 999
+        });
+
+        // Visual effect
+        createBurstEffect(player.x, player.y, radius);
+    }
+
+    // --- PING (RANGED) ---
+    else {
+        // Standard Projectile logic (existing)
+        const createProjectile = (angle) => {
             attacks.push({
                 x: player.x,
                 y: player.y,
-                vx: Math.cos(spreadAngle) * stats.projectileSpeed,
-                vy: Math.sin(spreadAngle) * stats.projectileSpeed,
-                life: 0.6,
+                vx: Math.cos(angle) * stats.projectileSpeed,
+                vy: Math.sin(angle) * stats.projectileSpeed,
+                life: 0.8,
                 size: 6,
                 type: 'packet',
-                damage: stats.damage * 0.6,
+                damage: stats.damage,
                 pierce: stats.pierce,
                 bounces: stats.bounceShots ? 2 : 0,
                 executeThreshold: stats.executeThreshold
             });
+        };
+
+        if (stats.coneAttack) {
+            // rm -rf cone style if unlocked
+            for (let i = -1; i <= 1; i++) {
+                createProjectile(player.attackAngle + i * 0.25);
+            }
+        } else {
+            createProjectile(player.attackAngle);
         }
-    } else {
-        // Single projectile
-        attacks.push({
-            x: player.x,
-            y: player.y,
-            vx: Math.cos(player.attackAngle) * stats.projectileSpeed,
-            vy: Math.sin(player.attackAngle) * stats.projectileSpeed,
-            life: 0.6,
-            size: 6,
-            type: 'packet',
-            damage: stats.damage,
-            pierce: stats.pierce,
-            bounces: stats.bounceShots ? 2 : 0,
-            executeThreshold: stats.executeThreshold
-        });
     }
 
-    // Spark particles
+    // Spark particles for all casts
     for (let i = 0; i < 6; i++) {
         const spread = (Math.random() - 0.5) * 0.4;
         particles.push({
@@ -769,6 +891,43 @@ function attack(targetX, targetY) {
             maxLife: 0.25,
             color: COLORS.cyan,
             size: 2,
+            type: 'spark'
+        });
+    }
+}
+
+function createSlashEffect(x, y, angle, size) {
+    // Add visual slash particles
+    for (let i = 0; i < 10; i++) {
+        const offset = (Math.random() - 0.5) * size;
+        const particleAngle = angle + (Math.random() - 0.5) * 1.0;
+        particles.push({
+            x: x + Math.cos(angle) * (size * 0.5),
+            y: y + Math.sin(angle) * (size * 0.5),
+            vx: Math.cos(particleAngle) * 300,
+            vy: Math.sin(particleAngle) * 300,
+            life: 0.15,
+            maxLife: 0.15,
+            color: COLORS.orange,
+            size: 3,
+            type: 'spark'
+        });
+    }
+}
+
+function createBurstEffect(x, y, radius) {
+    // Expanding ring effect
+    for (let i = 0; i < 20; i++) {
+        const angle = (i / 20) * Math.PI * 2;
+        particles.push({
+            x: x,
+            y: y,
+            vx: Math.cos(angle) * (radius * 3),
+            vy: Math.sin(angle) * (radius * 3),
+            life: 0.3,
+            maxLife: 0.3,
+            color: COLORS.magenta,
+            size: 4,
             type: 'spark'
         });
     }
@@ -969,7 +1128,34 @@ function update() {
             const dy = a.y - e.y;
             const dist = Math.sqrt(dx * dx + dy * dy);
 
-            if (dist < a.size + e.size) {
+            // Check persistent hit list for this enemy
+            if (a.hitList && a.hitList.includes(e.id)) continue; // Assume enemies have IDs or use object reference check
+            // Actually object reference check is safer if no IDs:
+            if (a.hitList && a.hitList.includes(e)) continue;
+
+            let hit = false;
+
+            if (a.type === 'slash') {
+                // Cone collision check
+                if (dist < a.size + e.size) {
+                    const angleToEnemy = Math.atan2(e.y - a.y, e.x - a.x);
+                    let angleDiff = Math.abs(angleToEnemy - a.angle);
+                    if (angleDiff > Math.PI) angleDiff = 2 * Math.PI - angleDiff;
+
+                    if (angleDiff < a.arc / 2) {
+                        hit = true;
+                    }
+                }
+            }
+            else if (a.type === 'burst') {
+                if (dist < a.size + e.size) hit = true;
+            }
+            else {
+                // Packet (standard projectile) check
+                if (dist < a.size + e.size) hit = true;
+            }
+
+            if (hit) {
                 // Use projectile's damage value
                 const damage = a.damage || 15;
 
@@ -981,12 +1167,27 @@ function update() {
                     e.health -= damage;
                 }
 
-                // Pierce logic - decrement pierce count instead of removing
+                // Handle knockback
+                const kbStrength = a.type === 'burst' ? 200 : 100;
+                const kbAngle = Math.atan2(e.y - a.y, e.x - a.x);
+                e.vx += Math.cos(kbAngle) * kbStrength;
+                e.vy += Math.sin(kbAngle) * kbStrength;
+
+                // Pierce logic
                 if (a.pierce && a.pierce > 0) {
                     a.pierce--;
+                    // For persistent attacks (high pierce), add to hitList
+                    if (a.pierce > 10) { // Arbitrary high number for "infinite" pierce
+                        if (!a.hitList) a.hitList = [];
+                        a.hitList.push(e);
+                    }
                 } else {
                     attacks.splice(i, 1);
                 }
+
+                // Break inner loop if projectile destroyed
+                if (!a.pierce || a.pierce <= 0) break;
+
 
                 // Electric spark particles
                 for (let k = 0; k < 10; k++) {
@@ -1261,9 +1462,35 @@ function render() {
     }
     ctx.globalAlpha = 1;
 
-    // Draw attacks (data packets)
+    // Draw attacks
     for (const a of attacks) {
-        drawDataPacket(a);
+        if (a.type === 'slash') {
+            // Draw slash arc
+            ctx.shadowBlur = 10;
+            ctx.shadowColor = COLORS.orange;
+            ctx.beginPath();
+            ctx.arc(player.x, player.y, a.size, a.angle - a.arc / 2, a.angle + a.arc / 2);
+            ctx.strokeStyle = COLORS.orange;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.shadowBlur = 0;
+        } else if (a.type === 'burst') {
+            // Draw burst ring
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = COLORS.magenta;
+            ctx.beginPath();
+            ctx.arc(a.x, a.y, a.size, 0, Math.PI * 2);
+            ctx.strokeStyle = COLORS.magenta;
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            // Inner fill
+            ctx.fillStyle = `rgba(255, 0, 255, 0.1)`;
+            ctx.fill();
+            ctx.shadowBlur = 0;
+        } else {
+            // Standard packet
+            drawDataPacket(a);
+        }
     }
 
     // Draw enemies

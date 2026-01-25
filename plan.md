@@ -104,6 +104,8 @@ Corridors connecting rooms could be:
 
 ## Builds
 
+see builds.md
+
 ### Bash (Melee)
 *"Bourne Again Shell"—and again, and again...*
 
