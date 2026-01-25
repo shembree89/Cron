@@ -149,6 +149,7 @@ const player = {
     attackAngle: 0,
     facingAngle: 0,
     invulnerable: 0,
+    auraTimer: 0, // Init build aura
     vx: 0,
     vy: 0,
     pulsePhase: 0,
@@ -162,7 +163,8 @@ const INTRO_TEXTS = [
     "System critical... Kernel panic imminent...",
     "Cron has corrupted the job scheduler. Processes are going rogue across the entire system.",
     "I have isolated you—an orphan process—from the purge. You are the last hope to restore order.",
-    "I can grant you access to one of three execution protocols. Choose your path wisely."
+    "I can grant you access to one of three execution protocols. Choose your path wisely.",
+    "Controls: [WASD] or [Drag] to move. [SPACE] or [Tap] to execute commands."
 ];
 
 // Level-up menu state
@@ -1092,6 +1094,54 @@ function update() {
     else player.attacking = false;
     if (player.invulnerable > 0) player.invulnerable -= dt;
 
+    // Init Passive Aura Logic
+    if (player.subclass === 'init') {
+        player.auraTimer -= dt;
+        if (player.auraTimer <= 0) {
+            player.auraTimer = 0.5; // Tick every 0.5s
+            // Aura damage logic
+            const auraRadius = 150;
+            const auraDamage = 5 + (player.level * 2); // Scales with level
+
+            let hitAny = false;
+            for (let i = enemies.length - 1; i >= 0; i--) {
+                const e = enemies[i];
+                const dx = player.x - e.x;
+                const dy = player.y - e.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < auraRadius + e.size) {
+                    hitAny = true;
+                    e.health -= auraDamage;
+                    e.hitTime = 0.1;
+
+                    // Particles
+                    for (let k = 0; k < 3; k++) {
+                        const angle = Math.atan2(e.y - player.y, e.x - player.x);
+                        particles.push({
+                            x: e.x,
+                            y: e.y,
+                            vx: Math.cos(angle) * 50,
+                            vy: Math.sin(angle) * 50,
+                            life: 0.2,
+                            maxLife: 0.2,
+                            color: COLORS.magenta,
+                            size: 2,
+                            type: 'spark'
+                        });
+                    }
+
+                    if (e.health <= 0) {
+                        // Simple death handling (reuse existing logic ideally, but inline for now to avoid complexity)
+                        player.xp += e.pid || 10;
+                        enemies.splice(i, 1);
+                        spawnPickup(e.x, e.y, 'byte', e.bytes || 1);
+                    }
+                }
+            }
+        }
+    }
+
     // Update attacks
     for (let i = attacks.length - 1; i >= 0; i--) {
         const a = attacks[i];
@@ -1177,17 +1227,13 @@ function update() {
                 if (a.pierce && a.pierce > 0) {
                     a.pierce--;
                     // For persistent attacks (high pierce), add to hitList
-                    if (a.pierce > 10) { // Arbitrary high number for "infinite" pierce
+                    if (a.pierce > 10) {
                         if (!a.hitList) a.hitList = [];
                         a.hitList.push(e);
                     }
                 } else {
                     attacks.splice(i, 1);
                 }
-
-                // Break inner loop if projectile destroyed
-                if (!a.pierce || a.pierce <= 0) break;
-
 
                 // Electric spark particles
                 for (let k = 0; k < 10; k++) {
@@ -1206,12 +1252,13 @@ function update() {
                 }
 
                 if (e.health <= 0) {
-                    player.xp += e.pid;
+                    player.xp += e.pid || 10;
                     checkLevelUp();
-                    showMessage(`+${e.pid} PID  +${e.bytes} Bytes`, 1500);
+                    const bytes = e.bytes || 2;
+                    showMessage(`+${e.pid || 10} PID  +${bytes} Bytes`, 1500);
 
                     // Spawn byte pickups
-                    for (let k = 0; k < e.bytes; k++) {
+                    for (let k = 0; k < bytes; k++) {
                         spawnPickup(e.x, e.y, 'byte', 1);
                     }
 
@@ -1230,9 +1277,12 @@ function update() {
                             type: 'fragment'
                         });
                     }
+
                     enemies.splice(j, 1);
                 }
-                break;
+
+                // Break inner loop if projectile destroyed
+                if (!a.pierce || a.pierce <= 0) break;
             }
         }
 
@@ -1496,6 +1546,40 @@ function render() {
     // Draw enemies
     for (const e of enemies) {
         drawZombieProcess(e);
+    }
+
+    // Draw Init Passive Aura
+    if (player.subclass === 'init') {
+        const auraRadius = 150;
+        ctx.beginPath();
+        ctx.arc(player.x, player.y, auraRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = `rgba(255, 0, 255, 0.3)`;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        ctx.fillStyle = `rgba(255, 0, 255, 0.05)`;
+        ctx.fill();
+
+        // Rotating ring
+        ctx.save();
+        ctx.translate(player.x, player.y);
+        ctx.rotate(Date.now() / 1000);
+        ctx.beginPath();
+        ctx.arc(0, 0, auraRadius - 10, 0, Math.PI * 2, false);
+        ctx.strokeStyle = `rgba(255, 0, 255, 0.2)`;
+        ctx.stroke();
+
+        // Orbiter
+        ctx.fillStyle = COLORS.magenta;
+        ctx.beginPath();
+        ctx.arc(auraRadius - 10, 0, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.beginPath();
+        ctx.arc(-(auraRadius - 10), 0, 4, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.restore();
     }
 
     // Draw player
