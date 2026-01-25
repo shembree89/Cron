@@ -295,7 +295,7 @@ Different shells could be:
    - `rm` — Destroy terrain (drops Bits)
    - `touch` — Create single block (costs Bits)
 6. **Simple health/stamina** (ROM/RAM)
-   - [x] Visual Bars implemented
+   - [x] Profile UI implemented (Bars removed)
    - [ ] Logic/Regen tuning
 7. **Basic enemy AI** and collision
 8. **One mini-boss**
