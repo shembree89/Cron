@@ -1481,14 +1481,19 @@ function drawPlayer() {
         { x: s * 0.6, y: s * 0.7 }        // 5: front-bottom (right side)
     ];
 
+    // The shape spans from x = -1.1s (tail) to x = 1.0s (front)
+    // Total width = 2.1s
+    // Front-to-back drain: at full, show entire shape; at low, show only back portion
+    const totalWidth = s * 2.1;
+    const tailX = -s * 1.1;
+
     // Draw health fill (left half, y < 0)
-    // Drains from top to bottom: full health shows full half, low health shows less
-    // The left half spans from y = -0.7s to y = 0
-    // At full health, show all of it. At low health, show only the top portion.
+    // Drains front-to-back: full health shows entire left half, low health shows only tail area
     ctx.save();
-    const healthHeight = s * 0.8 * healthRatio; // How much height to show
+    const healthWidth = totalWidth * healthRatio;
+    const healthClipRight = tailX + healthWidth; // Right edge of health clip
     ctx.beginPath();
-    ctx.rect(-s * 2, -s, s * 4, healthHeight); // Clip region: top portion
+    ctx.rect(tailX, -s, healthWidth, s); // Clip from tail toward front
     ctx.clip();
 
     ctx.beginPath();
@@ -1507,12 +1512,11 @@ function drawPlayer() {
     ctx.globalAlpha = (invulnerable > 0 && Math.floor(invulnerable * 20) % 2 === 0) ? 0.4 : 1;
 
     // Draw stamina fill (right half, y > 0)
-    // Drains from top to bottom: full stamina shows full half, low stamina shows less
-    // The right half spans from y = 0 to y = 0.7s
+    // Drains front-to-back: full stamina shows entire right half, low stamina shows only tail area
     ctx.save();
-    const staminaHeight = s * 0.8 * staminaRatio;
+    const staminaWidth = totalWidth * staminaRatio;
     ctx.beginPath();
-    ctx.rect(-s * 2, 0, s * 4, staminaHeight); // Clip region: top portion of right half
+    ctx.rect(tailX, 0, staminaWidth, s); // Clip from tail toward front
     ctx.clip();
 
     ctx.beginPath();
@@ -1522,7 +1526,7 @@ function drawPlayer() {
     ctx.lineTo(vertices[3].x, vertices[3].y);
     ctx.lineTo(0, 0);
     ctx.closePath();
-    ctx.fillStyle = COLORS.green;
+    ctx.fillStyle = COLORS.yellow;
     ctx.globalAlpha = 0.7;
     ctx.fill();
     ctx.restore();
@@ -1534,20 +1538,20 @@ function drawPlayer() {
         ctx.globalAlpha = 1;
     }
 
-    // Draw main shape outline
+    // Draw main shape outline (bright cyan - the "unfilled" XP state)
     ctx.beginPath();
     ctx.moveTo(vertices[0].x, vertices[0].y);
     for (let i = 1; i < vertices.length; i++) {
         ctx.lineTo(vertices[i].x, vertices[i].y);
     }
     ctx.closePath();
-    ctx.strokeStyle = 'rgba(0, 100, 100, 0.6)';  // Dim base outline
+    ctx.strokeStyle = COLORS.cyan;
     ctx.lineWidth = 2;
     ctx.shadowColor = COLORS.cyan;
     ctx.shadowBlur = 6 * pulse;
     ctx.stroke();
 
-    // Draw XP progress along shape outline (bright cyan that fills progressively)
+    // Draw XP progress along shape outline (darker color filling clockwise)
     if (xpProgress > 0) {
         const totalVerts = vertices.length;
         const progressVerts = xpProgress * totalVerts;
@@ -1571,10 +1575,9 @@ function drawPlayer() {
             );
         }
 
-        ctx.strokeStyle = COLORS.cyan;
+        ctx.strokeStyle = 'rgba(0, 80, 80, 0.9)'; // Darker cyan for XP progress
         ctx.lineWidth = 3;
-        ctx.shadowColor = COLORS.cyan;
-        ctx.shadowBlur = 20;
+        ctx.shadowBlur = 0;
         ctx.stroke();
     }
 
