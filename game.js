@@ -1452,9 +1452,11 @@ function drawDataPacket(a) {
 function drawPlayer() {
     const { x, y, size, invulnerable, pulsePhase, facingAngle, health, maxHealth, stamina, maxStamina, xp, level } = player;
 
+    // XP progress calculation: what fraction of current level is complete
+    const prevLevelXP = level > 0 ? XP_MILESTONES[level - 1] || 0 : 0;
     const nextLevelXP = level < XP_MILESTONES.length ? XP_MILESTONES[level] : XP_MILESTONES[XP_MILESTONES.length - 1];
-    const prevLevelXP = level > 1 && level - 1 < XP_MILESTONES.length ? XP_MILESTONES[level - 1] : 0;
-    const xpProgress = Math.min(1, Math.max(0, (xp - prevLevelXP) / (nextLevelXP - prevLevelXP)));
+    const xpForThisLevel = nextLevelXP - prevLevelXP;
+    const xpProgress = xpForThisLevel > 0 ? Math.min(1, Math.max(0, (xp - prevLevelXP) / xpForThisLevel)) : 0;
     const healthRatio = health / maxHealth;
     const staminaRatio = stamina / maxStamina;
     const pulse = 1 + Math.sin(pulsePhase) * 0.03;
@@ -1503,7 +1505,7 @@ function drawPlayer() {
     ctx.lineTo(vertices[3].x, vertices[3].y);
     ctx.lineTo(0, 0);
     ctx.closePath();
-    ctx.fillStyle = COLORS.red;
+    ctx.fillStyle = COLORS.magenta;
     ctx.globalAlpha = 0.7;
     ctx.fill();
     ctx.restore();
@@ -1526,7 +1528,7 @@ function drawPlayer() {
     ctx.lineTo(vertices[3].x, vertices[3].y);
     ctx.lineTo(0, 0);
     ctx.closePath();
-    ctx.fillStyle = COLORS.yellow;
+    ctx.fillStyle = COLORS.green;
     ctx.globalAlpha = 0.7;
     ctx.fill();
     ctx.restore();
