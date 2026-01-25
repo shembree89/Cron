@@ -1580,9 +1580,9 @@ function drawPlayer() {
             );
         }
 
-        ctx.strokeStyle = COLORS.orange; // Visible orange for XP progress
+        ctx.strokeStyle = '#4488ff'; // Electric blue for XP progress
         ctx.lineWidth = 3;
-        ctx.shadowColor = COLORS.orange;
+        ctx.shadowColor = '#4488ff';
         ctx.shadowBlur = 8;
         ctx.stroke();
     }
