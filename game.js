@@ -1481,13 +1481,7 @@ function drawPlayer() {
         { x: s * 0.6, y: s * 0.7 }        // 5: front-bottom (right side)
     ];
 
-    // Draw health fill (left/top half - y < 0 in rotated space)
-    // Clip region shows only the portion based on healthRatio (drains bottom to top)
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(-s * 2, -s * 2, s * 4, s * 2 * healthRatio + s * 0.1);
-    ctx.clip();
-
+    // Draw health fill (left half - opacity based on health level)
     ctx.beginPath();
     ctx.moveTo(vertices[0].x, vertices[0].y);
     ctx.lineTo(vertices[1].x, vertices[1].y);
@@ -1496,24 +1490,13 @@ function drawPlayer() {
     ctx.lineTo(0, 0);
     ctx.closePath();
     ctx.fillStyle = COLORS.red;
-    ctx.globalAlpha = 0.6;
+    ctx.globalAlpha = healthRatio * 0.7;
     ctx.fill();
-    ctx.restore();
 
-    // Reset alpha after clipping
-    if (invulnerable > 0 && Math.floor(invulnerable * 20) % 2 === 0) {
-        ctx.globalAlpha = 0.4;
-    } else {
-        ctx.globalAlpha = 1;
-    }
+    // Reset alpha
+    ctx.globalAlpha = (invulnerable > 0 && Math.floor(invulnerable * 20) % 2 === 0) ? 0.4 : 1;
 
-    // Draw stamina fill (right/bottom half - y > 0 in rotated space)
-    // Clip region shows only the portion based on staminaRatio (drains top to bottom)
-    ctx.save();
-    ctx.beginPath();
-    ctx.rect(-s * 2, s * 2 * (1 - staminaRatio) - s * 0.1, s * 4, s * 2 * staminaRatio + s * 0.1);
-    ctx.clip();
-
+    // Draw stamina fill (right half - opacity based on stamina level)
     ctx.beginPath();
     ctx.moveTo(vertices[0].x, vertices[0].y);
     ctx.lineTo(vertices[5].x, vertices[5].y);
@@ -1522,9 +1505,8 @@ function drawPlayer() {
     ctx.lineTo(0, 0);
     ctx.closePath();
     ctx.fillStyle = COLORS.green;
-    ctx.globalAlpha = 0.6;
+    ctx.globalAlpha = staminaRatio * 0.7;
     ctx.fill();
-    ctx.restore();
 
     // Reset alpha
     if (invulnerable > 0 && Math.floor(invulnerable * 20) % 2 === 0) {
@@ -1540,13 +1522,13 @@ function drawPlayer() {
         ctx.lineTo(vertices[i].x, vertices[i].y);
     }
     ctx.closePath();
-    ctx.strokeStyle = COLORS.cyan;
+    ctx.strokeStyle = 'rgba(0, 100, 100, 0.6)';  // Dim base outline
     ctx.lineWidth = 2;
     ctx.shadowColor = COLORS.cyan;
-    ctx.shadowBlur = 12 * pulse;
+    ctx.shadowBlur = 6 * pulse;
     ctx.stroke();
 
-    // Draw XP progress along shape outline (brighter line over the existing outline)
+    // Draw XP progress along shape outline (bright cyan that fills progressively)
     if (xpProgress > 0) {
         const totalVerts = vertices.length;
         const progressVerts = xpProgress * totalVerts;
@@ -1570,10 +1552,10 @@ function drawPlayer() {
             );
         }
 
-        ctx.strokeStyle = COLORS.white;
-        ctx.lineWidth = 2;
+        ctx.strokeStyle = COLORS.cyan;
+        ctx.lineWidth = 3;
         ctx.shadowColor = COLORS.cyan;
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = 20;
         ctx.stroke();
     }
 
