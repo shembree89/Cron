@@ -1459,116 +1459,168 @@ function drawPlayer() {
     const staminaRatio = stamina / maxStamina;
     const pulse = 1 + Math.sin(pulsePhase) * 0.03;
 
-    // Draw all shapes for comparison (offset from player position)
-    const shapes = [
-        { name: 'TEARDROP', offsetX: 0, offsetY: -80 },
-        { name: 'ARROWHEAD', offsetX: 80, offsetY: 0 },
-        { name: 'POINTED HEX', offsetX: 0, offsetY: 80 },
-        { name: 'SHIELD', offsetX: -80, offsetY: 0 }
-    ];
-
-    shapes.forEach(shape => {
-        ctx.save();
-        ctx.translate(x + shape.offsetX, y + shape.offsetY);
-        ctx.rotate(facingAngle);
-
-        const s = size * pulse;
-
-        // Draw shape based on type
-        ctx.beginPath();
-        if (shape.name === 'TEARDROP') {
-            // Fat front teardrop (bulb facing forward)
-            ctx.moveTo(s * 1.2, 0);  // Front tip
-            ctx.bezierCurveTo(s * 1.2, s * 0.8, s * 0.3, s * 1, -s * 0.8, s * 0.4);
-            ctx.lineTo(-s * 1.2, 0);  // Back point
-            ctx.lineTo(-s * 0.8, -s * 0.4);
-            ctx.bezierCurveTo(s * 0.3, -s * 1, s * 1.2, -s * 0.8, s * 1.2, 0);
-        } else if (shape.name === 'ARROWHEAD') {
-            // Sharp arrowhead
-            ctx.moveTo(s * 1.3, 0);  // Front point
-            ctx.lineTo(-s * 0.8, -s * 0.9);
-            ctx.lineTo(-s * 0.3, 0);
-            ctx.lineTo(-s * 0.8, s * 0.9);
-            ctx.closePath();
-        } else if (shape.name === 'POINTED HEX') {
-            // Hexagon with elongated front
-            ctx.moveTo(s * 1.4, 0);  // Front point (elongated)
-            ctx.lineTo(s * 0.5, -s * 0.7);
-            ctx.lineTo(-s * 0.6, -s * 0.7);
-            ctx.lineTo(-s * 1, 0);
-            ctx.lineTo(-s * 0.6, s * 0.7);
-            ctx.lineTo(s * 0.5, s * 0.7);
-            ctx.closePath();
-        } else if (shape.name === 'SHIELD') {
-            // Shield/cursor shape
-            ctx.moveTo(s * 1.2, 0);  // Front point
-            ctx.lineTo(s * 0.2, -s * 0.8);
-            ctx.lineTo(-s * 0.8, -s * 0.9);
-            ctx.lineTo(-s * 0.5, 0);
-            ctx.lineTo(-s * 0.8, s * 0.9);
-            ctx.lineTo(s * 0.2, s * 0.8);
-            ctx.closePath();
-        }
-
-        // Fill with health gradient (left/back)
-        ctx.fillStyle = `rgba(255, 80, 80, ${healthRatio * 0.6})`;
-        ctx.fill();
-
-        // Stamina overlay (right/front)
-        ctx.fillStyle = `rgba(80, 255, 80, ${staminaRatio * 0.4})`;
-        ctx.fill();
-
-        // Outline
-        ctx.strokeStyle = COLORS.cyan;
-        ctx.lineWidth = 2;
-        ctx.shadowColor = COLORS.cyan;
-        ctx.shadowBlur = 10 * pulse;
-        ctx.stroke();
-
-        // XP ring
-        if (xpProgress > 0) {
-            ctx.beginPath();
-            ctx.arc(0, 0, s * 1.5, -Math.PI / 2, -Math.PI / 2 + (Math.PI * 2 * xpProgress));
-            ctx.strokeStyle = COLORS.cyan;
-            ctx.lineWidth = 3;
-            ctx.shadowBlur = 12;
-            ctx.stroke();
-        }
-
-        // Center dot
-        ctx.beginPath();
-        ctx.arc(0, 0, 3, 0, Math.PI * 2);
-        ctx.fillStyle = COLORS.cyan;
-        ctx.fill();
-
-        ctx.restore();
-
-        // Draw label
-        ctx.fillStyle = COLORS.white;
-        ctx.font = '10px monospace';
-        ctx.textAlign = 'center';
-        ctx.fillText(shape.name, x + shape.offsetX, y + shape.offsetY + s * 2);
-    });
-
-    // Attack indicator on main position
-    if (player.attacking) {
-        ctx.save();
-        ctx.translate(x, y);
-        ctx.rotate(player.attackAngle);
-        ctx.beginPath();
-        ctx.moveTo(size + 30, 0);
-        ctx.lineTo(size + 45, -6);
-        ctx.lineTo(size + 50, 0);
-        ctx.lineTo(size + 45, 6);
-        ctx.closePath();
-        ctx.fillStyle = COLORS.cyan;
-        ctx.shadowColor = COLORS.cyan;
-        ctx.shadowBlur = 10;
-        ctx.fill();
-        ctx.restore();
+    // Handle invulnerability flashing
+    if (invulnerable > 0 && Math.floor(invulnerable * 20) % 2 === 0) {
+        ctx.globalAlpha = 0.4;
     }
 
+    ctx.save();
+    ctx.translate(x, y);
+    ctx.rotate(facingAngle);
+
+    const s = size * pulse;
+
+    // Define pointed hex vertices (fat front, pointy tail)
+    // Shape goes: front-top, top-left, back-top, tail, back-bottom, bottom-left, front-bottom
+    const vertices = [
+        { x: s * 0.9, y: -s * 0.5 },    // 0: front-top
+        { x: s * 0.1, y: -s * 0.8 },     // 1: top-left
+        { x: -s * 0.7, y: -s * 0.5 },    // 2: back-top
+        { x: -s * 1.2, y: 0 },           // 3: tail (pointy back)
+        { x: -s * 0.7, y: s * 0.5 },     // 4: back-bottom
+        { x: s * 0.1, y: s * 0.8 },      // 5: bottom-left
+        { x: s * 0.9, y: s * 0.5 },      // 6: front-bottom
+        { x: s * 1.1, y: 0 }             // 7: front center (flat front)
+    ];
+
+    // Draw health fill (left side, top to bottom) - uses clipping
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 1.5);
+    ctx.lineTo(-s * 2, -s * 1.5);
+    ctx.lineTo(-s * 2, -s * 1.5 + (s * 3 * (1 - healthRatio)));
+    ctx.lineTo(0, -s * 1.5 + (s * 3 * (1 - healthRatio)));
+    ctx.lineTo(0, s * 1.5);
+    ctx.lineTo(-s * 2, s * 1.5);
+    ctx.lineTo(-s * 2, -s * 1.5);
+    ctx.clip();
+
+    ctx.beginPath();
+    ctx.moveTo(vertices[7].x, vertices[7].y);
+    for (let i = 0; i <= 3; i++) {
+        ctx.lineTo(vertices[i].x, vertices[i].y);
+    }
+    ctx.lineTo(0, 0);
+    ctx.closePath();
+    ctx.fillStyle = COLORS.red;
+    ctx.globalAlpha = 0.7;
+    ctx.fill();
+    ctx.restore();
+
+    // Reset alpha after clipping
+    if (invulnerable > 0 && Math.floor(invulnerable * 20) % 2 === 0) {
+        ctx.globalAlpha = 0.4;
+    } else {
+        ctx.globalAlpha = 1;
+    }
+
+    // Draw stamina fill (right side, top to bottom) - uses clipping
+    ctx.save();
+    ctx.beginPath();
+    ctx.moveTo(0, -s * 1.5);
+    ctx.lineTo(s * 2, -s * 1.5);
+    ctx.lineTo(s * 2, -s * 1.5 + (s * 3 * (1 - staminaRatio)));
+    ctx.lineTo(0, -s * 1.5 + (s * 3 * (1 - staminaRatio)));
+    ctx.lineTo(0, s * 1.5);
+    ctx.lineTo(s * 2, s * 1.5);
+    ctx.lineTo(s * 2, -s * 1.5);
+    ctx.clip();
+
+    ctx.beginPath();
+    ctx.moveTo(vertices[3].x, vertices[3].y);
+    for (let i = 4; i <= 7; i++) {
+        ctx.lineTo(vertices[i].x, vertices[i].y);
+    }
+    ctx.lineTo(0, 0);
+    ctx.closePath();
+    ctx.fillStyle = COLORS.green;
+    ctx.globalAlpha = 0.7;
+    ctx.fill();
+    ctx.restore();
+
+    // Reset alpha
+    if (invulnerable > 0 && Math.floor(invulnerable * 20) % 2 === 0) {
+        ctx.globalAlpha = 0.4;
+    } else {
+        ctx.globalAlpha = 1;
+    }
+
+    // Draw main shape outline
+    ctx.beginPath();
+    ctx.moveTo(vertices[0].x, vertices[0].y);
+    for (let i = 1; i < vertices.length; i++) {
+        ctx.lineTo(vertices[i].x, vertices[i].y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = COLORS.cyan;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = COLORS.cyan;
+    ctx.shadowBlur = 12 * pulse;
+    ctx.stroke();
+
+    // Draw XP progress along shape contour
+    if (xpProgress > 0) {
+        const totalLength = vertices.length;
+        const progressLength = xpProgress * totalLength;
+
+        ctx.beginPath();
+        ctx.strokeStyle = COLORS.cyan;
+        ctx.lineWidth = 4;
+        ctx.shadowBlur = 15;
+
+        // Calculate offset vertices for outer contour
+        const offset = 5;
+        const outerVerts = vertices.map(v => {
+            const len = Math.sqrt(v.x * v.x + v.y * v.y);
+            return {
+                x: v.x + (v.x / len) * offset,
+                y: v.y + (v.y / len) * offset
+            };
+        });
+
+        // Draw progress along edges
+        ctx.moveTo(outerVerts[0].x, outerVerts[0].y);
+        for (let i = 0; i < Math.floor(progressLength); i++) {
+            const nextIdx = (i + 1) % outerVerts.length;
+            ctx.lineTo(outerVerts[nextIdx].x, outerVerts[nextIdx].y);
+        }
+
+        // Partial edge
+        if (progressLength % 1 > 0 && Math.floor(progressLength) < outerVerts.length) {
+            const currIdx = Math.floor(progressLength);
+            const nextIdx = (currIdx + 1) % outerVerts.length;
+            const partial = progressLength % 1;
+            const px = outerVerts[currIdx].x + (outerVerts[nextIdx].x - outerVerts[currIdx].x) * partial;
+            const py = outerVerts[currIdx].y + (outerVerts[nextIdx].y - outerVerts[currIdx].y) * partial;
+            ctx.lineTo(px, py);
+        }
+        ctx.stroke();
+    }
+
+    // Center core (pulsing)
+    ctx.beginPath();
+    ctx.arc(0, 0, 4 * pulse, 0, Math.PI * 2);
+    ctx.fillStyle = COLORS.cyan;
+    ctx.shadowBlur = 10;
+    ctx.fill();
+
+    // Attack direction indicator
+    if (player.attacking) {
+        ctx.rotate(-facingAngle + player.attackAngle);
+        ctx.beginPath();
+        ctx.moveTo(s * 1.3, 0);
+        ctx.lineTo(s * 1.6, -5);
+        ctx.lineTo(s * 1.8, 0);
+        ctx.lineTo(s * 1.6, 5);
+        ctx.closePath();
+        ctx.fillStyle = COLORS.cyan;
+        ctx.shadowBlur = 12;
+        ctx.fill();
+    }
+
+    ctx.restore();
     ctx.shadowBlur = 0;
+    ctx.globalAlpha = 1;
 }
 
 function drawZombieProcess(e) {
