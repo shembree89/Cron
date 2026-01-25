@@ -1524,9 +1524,11 @@ function drawPlayer() {
         ctx.stroke();
     }
 
-    // Attack direction indicator
+    // Attack direction indicator (needs to counter-rotate player's base rotation)
     if (player.attacking) {
-        ctx.rotate(player.attackAngle);
+        // attackAngle is in world space, but we're already rotated by facingAngle + PI/2
+        // So we need to counter-rotate first, then apply attackAngle
+        ctx.rotate(-facingAngle - Math.PI / 2 + player.attackAngle);
         ctx.beginPath();
         ctx.moveTo(size + 8, 0);
         ctx.lineTo(size + 20, -6);
