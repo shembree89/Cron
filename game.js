@@ -1450,7 +1450,12 @@ function drawDataPacket(a) {
 }
 
 function drawPlayer() {
-    const { x, y, size, invulnerable, pulsePhase, facingAngle } = player;
+    const { x, y, size, invulnerable, pulsePhase, facingAngle, health, maxHealth, stamina, maxStamina, xp, level } = player;
+
+    // Calculate XP progress to next level
+    const nextLevelXP = level < XP_MILESTONES.length ? XP_MILESTONES[level] : XP_MILESTONES[XP_MILESTONES.length - 1];
+    const prevLevelXP = level > 1 && level - 1 < XP_MILESTONES.length ? XP_MILESTONES[level - 1] : 0;
+    const xpProgress = (xp - prevLevelXP) / (nextLevelXP - prevLevelXP);
 
     if (invulnerable > 0 && Math.floor(invulnerable * 20) % 2 === 0) {
         ctx.globalAlpha = 0.4;
@@ -1458,86 +1463,150 @@ function drawPlayer() {
 
     ctx.save();
     ctx.translate(x, y);
-    ctx.rotate(facingAngle + Math.PI / 2); // Rotate to face movement direction (offset by 90deg since chip faces "up")
 
-    const pulse = 1 + Math.sin(pulsePhase) * 0.05;
+    const pulse = 1 + Math.sin(pulsePhase) * 0.03;
+    const hexRadius = size * pulse;
 
-    // Outer chip package (rectangle with notch)
+    // Helper function to get hexagon points
+    const getHexPoint = (index, radius) => {
+        const angle = (Math.PI / 3) * index - Math.PI / 2; // Start from top
+        return {
+            x: Math.cos(angle) * radius,
+            y: Math.sin(angle) * radius
+        };
+    };
+
+    // Draw health fill (left half of hexagon - points 3, 4, 5, 0)
+    const healthRatio = health / maxHealth;
+    if (healthRatio > 0) {
+        ctx.beginPath();
+        ctx.moveTo(0, 0); // Center
+        for (let i = 3; i <= 6; i++) {
+            const p = getHexPoint(i % 6, hexRadius);
+            ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = `rgba(255, 80, 80, ${0.3 + healthRatio * 0.5})`;
+        ctx.fill();
+
+        // Health fill level indicator
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        for (let i = 3; i <= 6; i++) {
+            const p = getHexPoint(i % 6, hexRadius * healthRatio);
+            ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = COLORS.red;
+        ctx.globalAlpha = 0.7;
+        ctx.fill();
+        ctx.globalAlpha = invulnerable > 0 && Math.floor(invulnerable * 20) % 2 === 0 ? 0.4 : 1;
+    }
+
+    // Draw stamina fill (right half of hexagon - points 0, 1, 2, 3)
+    const staminaRatio = stamina / maxStamina;
+    if (staminaRatio > 0) {
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        for (let i = 0; i <= 3; i++) {
+            const p = getHexPoint(i, hexRadius);
+            ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = `rgba(80, 255, 80, ${0.3 + staminaRatio * 0.5})`;
+        ctx.fill();
+
+        // Stamina fill level indicator
+        ctx.beginPath();
+        ctx.moveTo(0, 0);
+        for (let i = 0; i <= 3; i++) {
+            const p = getHexPoint(i, hexRadius * staminaRatio);
+            ctx.lineTo(p.x, p.y);
+        }
+        ctx.closePath();
+        ctx.fillStyle = COLORS.green;
+        ctx.globalAlpha = 0.7;
+        ctx.fill();
+        ctx.globalAlpha = invulnerable > 0 && Math.floor(invulnerable * 20) % 2 === 0 ? 0.4 : 1;
+    }
+
+    // Draw hexagon outline
     ctx.beginPath();
-    ctx.moveTo(-size, -size * 0.8);
-    ctx.lineTo(-size * 0.3, -size * 0.8);
-    ctx.arc(0, -size * 0.8, size * 0.3, Math.PI, 0, true); // Notch
-    ctx.lineTo(size, -size * 0.8);
-    ctx.lineTo(size, size * 0.8);
-    ctx.lineTo(-size, size * 0.8);
+    for (let i = 0; i < 6; i++) {
+        const p = getHexPoint(i, hexRadius);
+        if (i === 0) ctx.moveTo(p.x, p.y);
+        else ctx.lineTo(p.x, p.y);
+    }
     ctx.closePath();
-
     ctx.strokeStyle = COLORS.cyan;
-    ctx.lineWidth = 3;
+    ctx.lineWidth = 2;
     ctx.shadowColor = COLORS.cyan;
-    ctx.shadowBlur = 15 * pulse;
+    ctx.shadowBlur = 10 * pulse;
     ctx.stroke();
 
-    ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
-    ctx.fill();
-
-    // IC pins on left and right
-    ctx.fillStyle = COLORS.copper;
-    ctx.shadowBlur = 0;
-    const pinSpacing = size * 0.4;
-    for (let i = -1; i <= 1; i++) {
-        // Left pins
-        ctx.fillRect(-size - 6, i * pinSpacing - 3, 6, 6);
-        // Right pins
-        ctx.fillRect(size, i * pinSpacing - 3, 6, 6);
-    }
-
-    // Internal die (the "brain")
-    ctx.beginPath();
-    ctx.rect(-size * 0.5, -size * 0.4, size, size * 0.8);
-    ctx.strokeStyle = COLORS.green;
-    ctx.lineWidth = 1;
-    ctx.shadowColor = COLORS.green;
-    ctx.shadowBlur = 10;
-    ctx.stroke();
-
-    // Central core indicator (pulsing)
-    ctx.beginPath();
-    ctx.arc(0, 0, 6 * pulse, 0, Math.PI * 2);
-    ctx.fillStyle = COLORS.green;
-    ctx.shadowBlur = 15;
-    ctx.fill();
-
-    // Bond wires (connecting die to pins)
-    ctx.strokeStyle = COLORS.gold;
-    ctx.lineWidth = 1;
-    ctx.shadowBlur = 0;
-    for (let i = -1; i <= 1; i++) {
-        ctx.beginPath();
-        ctx.moveTo(-size * 0.5, i * pinSpacing);
-        ctx.quadraticCurveTo(-size * 0.7, i * pinSpacing - 5, -size, i * pinSpacing);
-        ctx.stroke();
+    // Draw XP progress along outer edge (thicker glow line)
+    if (xpProgress > 0) {
+        const xpRadius = hexRadius + 4;
+        const totalEdges = 6;
+        const edgesFilled = xpProgress * totalEdges;
 
         ctx.beginPath();
-        ctx.moveTo(size * 0.5, i * pinSpacing);
-        ctx.quadraticCurveTo(size * 0.7, i * pinSpacing - 5, size, i * pinSpacing);
+        ctx.strokeStyle = COLORS.cyan;
+        ctx.lineWidth = 4;
+        ctx.shadowColor = COLORS.cyan;
+        ctx.shadowBlur = 15;
+
+        // Draw filled edges
+        for (let i = 0; i < Math.floor(edgesFilled); i++) {
+            const p1 = getHexPoint(i, xpRadius);
+            const p2 = getHexPoint(i + 1, xpRadius);
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p2.x, p2.y);
+        }
+
+        // Draw partial edge
+        if (edgesFilled % 1 > 0) {
+            const edgeIndex = Math.floor(edgesFilled);
+            const p1 = getHexPoint(edgeIndex, xpRadius);
+            const p2 = getHexPoint(edgeIndex + 1, xpRadius);
+            const partial = edgesFilled % 1;
+            ctx.moveTo(p1.x, p1.y);
+            ctx.lineTo(p1.x + (p2.x - p1.x) * partial, p1.y + (p2.y - p1.y) * partial);
+        }
         ctx.stroke();
     }
 
-    // Attack direction indicator (needs to counter-rotate player's base rotation)
+    // Central core (pulsing dot)
+    ctx.beginPath();
+    ctx.arc(0, 0, 4 * pulse, 0, Math.PI * 2);
+    ctx.fillStyle = COLORS.cyan;
+    ctx.shadowColor = COLORS.cyan;
+    ctx.shadowBlur = 12;
+    ctx.fill();
+
+    // Facing direction indicator (small triangle)
+    ctx.rotate(facingAngle);
+    ctx.beginPath();
+    ctx.moveTo(hexRadius * 0.5, 0);
+    ctx.lineTo(hexRadius * 0.3, -4);
+    ctx.lineTo(hexRadius * 0.3, 4);
+    ctx.closePath();
+    ctx.fillStyle = COLORS.white;
+    ctx.shadowBlur = 0;
+    ctx.fill();
+
+    // Attack direction indicator
     if (player.attacking) {
-        // attackAngle is in world space, but we're already rotated by facingAngle + PI/2
-        // So we need to counter-rotate first, then apply attackAngle
-        ctx.rotate(-facingAngle - Math.PI / 2 + player.attackAngle);
+        ctx.rotate(-facingAngle + player.attackAngle);
         ctx.beginPath();
-        ctx.moveTo(size + 8, 0);
-        ctx.lineTo(size + 20, -6);
-        ctx.lineTo(size + 25, 0);
-        ctx.lineTo(size + 20, 6);
+        ctx.moveTo(hexRadius + 5, 0);
+        ctx.lineTo(hexRadius + 15, -5);
+        ctx.lineTo(hexRadius + 20, 0);
+        ctx.lineTo(hexRadius + 15, 5);
         ctx.closePath();
         ctx.fillStyle = COLORS.cyan;
         ctx.shadowColor = COLORS.cyan;
-        ctx.shadowBlur = 12;
+        ctx.shadowBlur = 10;
         ctx.fill();
     }
 
