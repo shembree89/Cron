@@ -437,6 +437,13 @@ function handleTouchStart(e) {
             touch.leftStartY = y;
             touch.leftCurrentX = x;
             touch.leftCurrentY = y;
+            // Visual feedback
+            particles.push({
+                x: x, y: y,
+                vx: 0, vy: 0,
+                life: 0.5, maxLife: 0.5,
+                color: 'rgba(0, 255, 255, 0.5)', size: 30, type: 'spark'
+            });
             showMessage('Joystick activated', 500);
         } else if (!isLeftSide && !touch.rightActive) {
             // Right side - attack swipe
@@ -444,6 +451,13 @@ function handleTouchStart(e) {
             touch.rightId = t.identifier;
             touch.rightStartX = x;
             touch.rightStartY = y;
+            // Visual feedback
+            particles.push({
+                x: x, y: y,
+                vx: 0, vy: 0,
+                life: 0.5, maxLife: 0.5,
+                color: 'rgba(255, 0, 0, 0.5)', size: 30, type: 'spark'
+            });
             showMessage('Attack swipe started', 500);
         }
     }
@@ -453,13 +467,24 @@ function handleTouchMove(e) {
     e.preventDefault();
     for (const t of e.changedTouches) {
         if (t.identifier === touch.leftId) {
-            touch.leftCurrentX = t.clientX;
-            touch.leftCurrentY = t.clientY;
+            const x = t.clientX;
+            const y = t.clientY;
+            touch.leftCurrentX = x;
+            touch.leftCurrentY = y;
 
             // Calculate joystick direction
             const dx = touch.leftCurrentX - touch.leftStartX;
             const dy = touch.leftCurrentY - touch.leftStartY;
             const dist = Math.sqrt(dx * dx + dy * dy);
+
+            // Visual feedback for drag
+            if (Math.random() > 0.8) {
+                particles.push({
+                    x: x, y: y, vx: 0, vy: 0,
+                    life: 0.2, maxLife: 0.2,
+                    color: 'rgba(0, 255, 255, 0.2)', size: 5, type: 'spark'
+                });
+            }
 
             if (dist > 10) {
                 // Normalize and apply to keys
