@@ -14,14 +14,16 @@ The Kernel serves as the player's guide and narrator throughout the game. In the
 ---
 
 ## Player
-### Current Design (V5)
+### Current Design (V6 - Profile UI)
 The player is a custom **Hexagonal Molecular Chip**:
-- **Outer Frame**: Cyan hexagon. Left side = XP, Right side = Stamina.
-- **Inner Core**: Smaller filled hexagon pattern that shares the **Front** vertex with the outer frame (creating a pointer).
-- **Health**: Magenta background fill of the Inner Core. Drains **Front-to-Back** (pointer empties first).
-- **XP Bar (Left)**: Electric Blue solid bar wrapping Back->TopLeft->Front. Fills from Back to Front.
-- **Stamina Bar (Right)**: Green solid bar wrapping Front->BottomRight->Back. Drains Front to Back (anchored at Back).
-- **Visuals**: Perimeter bars stop at ~85% to Front to leave a gap. Inner core has a static molecular network overlay.
+- **Outer Frame**: Cyan hexagon.
+- **Inner Core**: Smaller filled hexagon pattern.
+- **Health**: Magenta background fill of the Inner Core.
+- **Visuals**: No on-screen perimeter bars (moved to Profile UI).
+
+### HUD / UI
+- **Profile Button**: Bottom-right corner icon (User silhouette). Toggle to view stats.
+- **Profile View**: Modal overlay showing numerical stats for Health (ROM), Stamina (RAM), XP (PID), Bits, and Bytes.
 
 ### Player Stats
 | Stat | Description |
