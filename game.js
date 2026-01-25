@@ -1471,39 +1471,32 @@ function drawPlayer() {
     const s = size * pulse;
 
     // Define pointed hex vertices (fat front, pointy tail)
-    // Shape goes: front-top, top-left, back-top, tail, back-bottom, bottom-left, front-bottom
+    // Vertices go clockwise: front, front-top, back-top, tail, back-bottom, front-bottom
     const vertices = [
-        { x: s * 0.9, y: -s * 0.5 },    // 0: front-top
-        { x: s * 0.1, y: -s * 0.8 },     // 1: top-left
-        { x: -s * 0.7, y: -s * 0.5 },    // 2: back-top
-        { x: -s * 1.2, y: 0 },           // 3: tail (pointy back)
-        { x: -s * 0.7, y: s * 0.5 },     // 4: back-bottom
-        { x: s * 0.1, y: s * 0.8 },      // 5: bottom-left
-        { x: s * 0.9, y: s * 0.5 },      // 6: front-bottom
-        { x: s * 1.1, y: 0 }             // 7: front center (flat front)
+        { x: s * 1.0, y: 0 },             // 0: front center
+        { x: s * 0.6, y: -s * 0.7 },      // 1: front-top (left side)
+        { x: -s * 0.5, y: -s * 0.6 },     // 2: back-top (left side)
+        { x: -s * 1.1, y: 0 },            // 3: tail (pointy back)
+        { x: -s * 0.5, y: s * 0.6 },      // 4: back-bottom (right side)
+        { x: s * 0.6, y: s * 0.7 }        // 5: front-bottom (right side)
     ];
 
-    // Draw health fill (left side, top to bottom) - uses clipping
+    // Draw health fill (left/top half - y < 0 in rotated space)
+    // Clip region shows only the portion based on healthRatio (drains bottom to top)
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(0, -s * 1.5);
-    ctx.lineTo(-s * 2, -s * 1.5);
-    ctx.lineTo(-s * 2, -s * 1.5 + (s * 3 * (1 - healthRatio)));
-    ctx.lineTo(0, -s * 1.5 + (s * 3 * (1 - healthRatio)));
-    ctx.lineTo(0, s * 1.5);
-    ctx.lineTo(-s * 2, s * 1.5);
-    ctx.lineTo(-s * 2, -s * 1.5);
+    ctx.rect(-s * 2, -s * 2, s * 4, s * 2 * healthRatio + s * 0.1);
     ctx.clip();
 
     ctx.beginPath();
-    ctx.moveTo(vertices[7].x, vertices[7].y);
-    for (let i = 0; i <= 3; i++) {
-        ctx.lineTo(vertices[i].x, vertices[i].y);
-    }
+    ctx.moveTo(vertices[0].x, vertices[0].y);
+    ctx.lineTo(vertices[1].x, vertices[1].y);
+    ctx.lineTo(vertices[2].x, vertices[2].y);
+    ctx.lineTo(vertices[3].x, vertices[3].y);
     ctx.lineTo(0, 0);
     ctx.closePath();
     ctx.fillStyle = COLORS.red;
-    ctx.globalAlpha = 0.7;
+    ctx.globalAlpha = 0.6;
     ctx.fill();
     ctx.restore();
 
@@ -1514,27 +1507,22 @@ function drawPlayer() {
         ctx.globalAlpha = 1;
     }
 
-    // Draw stamina fill (right side, top to bottom) - uses clipping
+    // Draw stamina fill (right/bottom half - y > 0 in rotated space)
+    // Clip region shows only the portion based on staminaRatio (drains top to bottom)
     ctx.save();
     ctx.beginPath();
-    ctx.moveTo(0, -s * 1.5);
-    ctx.lineTo(s * 2, -s * 1.5);
-    ctx.lineTo(s * 2, -s * 1.5 + (s * 3 * (1 - staminaRatio)));
-    ctx.lineTo(0, -s * 1.5 + (s * 3 * (1 - staminaRatio)));
-    ctx.lineTo(0, s * 1.5);
-    ctx.lineTo(s * 2, s * 1.5);
-    ctx.lineTo(s * 2, -s * 1.5);
+    ctx.rect(-s * 2, s * 2 * (1 - staminaRatio) - s * 0.1, s * 4, s * 2 * staminaRatio + s * 0.1);
     ctx.clip();
 
     ctx.beginPath();
-    ctx.moveTo(vertices[3].x, vertices[3].y);
-    for (let i = 4; i <= 7; i++) {
-        ctx.lineTo(vertices[i].x, vertices[i].y);
-    }
+    ctx.moveTo(vertices[0].x, vertices[0].y);
+    ctx.lineTo(vertices[5].x, vertices[5].y);
+    ctx.lineTo(vertices[4].x, vertices[4].y);
+    ctx.lineTo(vertices[3].x, vertices[3].y);
     ctx.lineTo(0, 0);
     ctx.closePath();
     ctx.fillStyle = COLORS.green;
-    ctx.globalAlpha = 0.7;
+    ctx.globalAlpha = 0.6;
     ctx.fill();
     ctx.restore();
 
@@ -1558,42 +1546,34 @@ function drawPlayer() {
     ctx.shadowBlur = 12 * pulse;
     ctx.stroke();
 
-    // Draw XP progress along shape contour
+    // Draw XP progress along shape outline (brighter line over the existing outline)
     if (xpProgress > 0) {
-        const totalLength = vertices.length;
-        const progressLength = xpProgress * totalLength;
+        const totalVerts = vertices.length;
+        const progressVerts = xpProgress * totalVerts;
 
         ctx.beginPath();
-        ctx.strokeStyle = COLORS.cyan;
-        ctx.lineWidth = 4;
-        ctx.shadowBlur = 15;
+        ctx.moveTo(vertices[0].x, vertices[0].y);
 
-        // Calculate offset vertices for outer contour
-        const offset = 5;
-        const outerVerts = vertices.map(v => {
-            const len = Math.sqrt(v.x * v.x + v.y * v.y);
-            return {
-                x: v.x + (v.x / len) * offset,
-                y: v.y + (v.y / len) * offset
-            };
-        });
-
-        // Draw progress along edges
-        ctx.moveTo(outerVerts[0].x, outerVerts[0].y);
-        for (let i = 0; i < Math.floor(progressLength); i++) {
-            const nextIdx = (i + 1) % outerVerts.length;
-            ctx.lineTo(outerVerts[nextIdx].x, outerVerts[nextIdx].y);
+        for (let i = 0; i < Math.floor(progressVerts); i++) {
+            const nextIdx = (i + 1) % totalVerts;
+            ctx.lineTo(vertices[nextIdx].x, vertices[nextIdx].y);
         }
 
         // Partial edge
-        if (progressLength % 1 > 0 && Math.floor(progressLength) < outerVerts.length) {
-            const currIdx = Math.floor(progressLength);
-            const nextIdx = (currIdx + 1) % outerVerts.length;
-            const partial = progressLength % 1;
-            const px = outerVerts[currIdx].x + (outerVerts[nextIdx].x - outerVerts[currIdx].x) * partial;
-            const py = outerVerts[currIdx].y + (outerVerts[nextIdx].y - outerVerts[currIdx].y) * partial;
-            ctx.lineTo(px, py);
+        if (progressVerts % 1 > 0) {
+            const currIdx = Math.floor(progressVerts) % totalVerts;
+            const nextIdx = (currIdx + 1) % totalVerts;
+            const partial = progressVerts % 1;
+            ctx.lineTo(
+                vertices[currIdx].x + (vertices[nextIdx].x - vertices[currIdx].x) * partial,
+                vertices[currIdx].y + (vertices[nextIdx].y - vertices[currIdx].y) * partial
+            );
         }
+
+        ctx.strokeStyle = COLORS.white;
+        ctx.lineWidth = 2;
+        ctx.shadowColor = COLORS.cyan;
+        ctx.shadowBlur = 12;
         ctx.stroke();
     }
 
