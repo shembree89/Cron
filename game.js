@@ -182,6 +182,7 @@ const BLOCK_SIZE = 40;
 let enemies = [];
 const ENEMY_SPAWN_INTERVAL = 3000;
 let lastSpawn = 0;
+let spawnTimer = 0;
 const MAX_ENEMIES = 8;
 
 // Attack projectiles (data packets)
@@ -1016,39 +1017,46 @@ function showMessage(text, duration = 2000) {
 }
 
 function gameLoop(timestamp) {
-    game.deltaTime = Math.min((timestamp - game.lastTime) / 1000, 0.1);
-    game.lastTime = timestamp;
-    game.time += game.deltaTime;
+    try {
+        // console.log('Loop heartbeat'); // DEBUG
+        game.deltaTime = Math.min((timestamp - game.lastTime) / 1000, 0.1);
+        game.lastTime = timestamp;
+        game.time += game.deltaTime;
 
-    if (!game.paused) {
-        update();
-    }
-    // Also update profile view if open to show real-time changes (e.g. regeneration) if we decided to keep it strictly paused, this might not be needed, but good for polish
-    if (player.profileOpen) {
-        updateProfileView();
-    }
-    render();
+        if (!game.paused) {
+            update();
+        }
+        // Also update profile view if open to show real-time changes (e.g. regeneration) if we decided to keep it strictly paused, this might not be needed, but good for polish
+        if (player.profileOpen) {
+            updateProfileView();
+        }
+        render();
 
-    // Draw level-up menu on top if active
-    if (levelUpMenu.active) {
-        renderLevelUpMenu();
-    }
+        // Draw level-up menu on top if active
+        if (levelUpMenu.active) {
+            renderLevelUpMenu();
+        }
 
-    // Draw death screen on top if dead
-    if (game.dead) {
-        renderDeathScreen();
-    }
+        // Draw death screen on top if dead
+        if (game.dead) {
+            renderDeathScreen();
+        }
 
-    // Keep running even when dead (to show death screen) or paused
-    if (game.running || game.dead) {
-        requestAnimationFrame(gameLoop);
+        // Keep running even when dead (to show death screen) or paused
+        if (game.running || game.dead) {
+            requestAnimationFrame(gameLoop);
+        }
+    } catch (err) {
+        console.error("Game Loop Crashed:", err);
     }
 }
 
 function update() {
+    // console.log('Update running', gameState, game.deltaTime); // DEBUG
     if (gameState !== 'PLAYING') return;
 
     const dt = game.deltaTime;
+    // console.log('dt:', dt); // DEBUG
     const stats = getPlayerStats();
 
     // Spawn enemies
@@ -1473,10 +1481,7 @@ function update() {
     }
 
     // Spawn enemies
-    if (Date.now() - lastSpawn > ENEMY_SPAWN_INTERVAL) {
-        spawnEnemy();
-        lastSpawn = Date.now();
-    }
+    // Removed duplicate polling logic in favor of dt-based timer above.
 
     // Legacy HUD removed
 }
