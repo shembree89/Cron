@@ -1551,7 +1551,7 @@ function drawPlayer() {
     ctx.shadowBlur = 6 * pulse;
     ctx.stroke();
 
-    // Draw XP progress along shape outline (darker color filling clockwise)
+    // Draw XP progress along shape outline (fills CLOCKWISE with visible color)
     if (xpProgress > 0) {
         const totalVerts = vertices.length;
         const progressVerts = xpProgress * totalVerts;
@@ -1559,25 +1559,31 @@ function drawPlayer() {
         ctx.beginPath();
         ctx.moveTo(vertices[0].x, vertices[0].y);
 
+        // Go backwards through vertices for clockwise fill (vertices are defined clockwise)
         for (let i = 0; i < Math.floor(progressVerts); i++) {
-            const nextIdx = (i + 1) % totalVerts;
-            ctx.lineTo(vertices[nextIdx].x, vertices[nextIdx].y);
+            const nextIdx = (totalVerts - i - 1 + totalVerts) % totalVerts;
+            if (i === 0) {
+                ctx.lineTo(vertices[totalVerts - 1].x, vertices[totalVerts - 1].y);
+            } else {
+                ctx.lineTo(vertices[nextIdx].x, vertices[nextIdx].y);
+            }
         }
 
         // Partial edge
-        if (progressVerts % 1 > 0) {
-            const currIdx = Math.floor(progressVerts) % totalVerts;
-            const nextIdx = (currIdx + 1) % totalVerts;
+        if (progressVerts % 1 > 0 && Math.floor(progressVerts) < totalVerts) {
+            const currIdx = (totalVerts - Math.floor(progressVerts)) % totalVerts;
+            const prevIdx = (currIdx + 1) % totalVerts;
             const partial = progressVerts % 1;
             ctx.lineTo(
-                vertices[currIdx].x + (vertices[nextIdx].x - vertices[currIdx].x) * partial,
-                vertices[currIdx].y + (vertices[nextIdx].y - vertices[currIdx].y) * partial
+                vertices[prevIdx].x + (vertices[currIdx].x - vertices[prevIdx].x) * partial,
+                vertices[prevIdx].y + (vertices[currIdx].y - vertices[prevIdx].y) * partial
             );
         }
 
-        ctx.strokeStyle = 'rgba(0, 80, 80, 0.9)'; // Darker cyan for XP progress
+        ctx.strokeStyle = COLORS.orange; // Visible orange for XP progress
         ctx.lineWidth = 3;
-        ctx.shadowBlur = 0;
+        ctx.shadowColor = COLORS.orange;
+        ctx.shadowBlur = 8;
         ctx.stroke();
     }
 
