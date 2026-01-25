@@ -73,9 +73,9 @@ body {
 /* Profile Button */
 #profile-btn-container {
     position: absolute;
-    bottom: 20px;
+    bottom: 50px;
     /* Fallback */
-    bottom: max(20px, env(safe-area-inset-bottom) + 20px);
+    bottom: max(50px, env(safe-area-inset-bottom) + 50px);
     right: 20px;
     /* Fallback */
     right: max(20px, env(safe-area-inset-right) + 20px);
