@@ -242,6 +242,11 @@ function setupTouchControls() {
             const build = card.getAttribute('data-class');
             selectClass(build);
         });
+        card.addEventListener('touchstart', (e) => {
+            e.preventDefault(); // Prevent ghost clicks
+            const build = card.getAttribute('data-class');
+            selectClass(build);
+        }, { passive: false });
     });
 
     // Using Touch Events - confirmed working on Android Chrome
