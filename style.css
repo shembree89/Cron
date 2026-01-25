@@ -73,8 +73,8 @@ body {
 /* Profile Button */
 #profile-btn-container {
     position: absolute;
-    bottom: 20px;
-    right: 20px;
+    bottom: 30px;
+    right: 30px;
 }
 
 #profile-btn {
@@ -93,13 +93,14 @@ body {
 
 #profile-btn:hover {
     box-shadow: 0 0 20px var(--cyan);
-    background: rgba(0, 40, 40, 0.9);
+    background: rgba(0, 50, 50, 0.9);
 }
 
 #profile-btn .icon {
     color: var(--cyan);
-    font-weight: bold;
-    font-size: 14px;
+    width: 32px;
+    height: 32px;
+    filter: drop-shadow(0 0 5px var(--cyan));
 }
 
 /* Profile View Modal */
