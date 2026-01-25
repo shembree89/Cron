@@ -11,7 +11,7 @@ The game uses two coordinate systems:
    - `screenX = worldX - camera.x`
    - `screenY = worldY - camera.y`
 
-### Player Rendering (V5 Design)
+### Player Rendering (V6 Design)
 The player is rendered as a custom vector shape designed to look like a TRON-style hexagonal chip with a molecular core.
 
 **Components:**
@@ -20,15 +20,15 @@ The player is rendered as a custom vector shape designed to look like a TRON-sty
    - **Health Fill**: The inner shape is filled with Magenta (`#ff00ff`) based on current HP.
    - The fill drains from **Front (+X/Top visual)** to **Back (-X/Bottom visual)**.
    - Implementation uses a clip mask of the inner shape and a filling rectangle that shrinks from the front.
-3. **Perimeter Bars**: Solid bars that wrap around the hexagon's perimeter.
-   - **XP Bar (Left/Port)**: Wraps from Back (-180°) -> Top-Left -> Top-Right -> towards Front.
-     - Anchored at Back. Fills towards Front.
-     - Color: Electric Blue (`#4488ff`).
-   - **Stamina Bar (Right/Starboard)**: Wraps from Front -> Bottom-Right -> Bottom-Left -> Back.
-     - Anchored at Back. Drains Front-to-Back (i.e., at 50% stamina, the bar is half-full starting from the back).
-     - Color: Bright Green (`#00ff00`).
-   - **Visuals**: Both bars stop at ~85% of the way to the Front vertex to leave a gap, emphasizing the Front pointer.
-4. **Molecular Core**: A static network of nodes and edges drawn over the Health Fill in the center.
+3. **Molecular Core**: A static network of nodes and edges drawn over the Health Fill in the center.
+
+## Hybrid UI System
+The game uses a hybrid rendering approach:
+1.  **Game World**: Rendered on HTML5 Canvas (Player, Enemies, Terrain, Particles).
+2.  **Interface**: Rendered using DOM elements (HTML/CSS) overlaying the canvas.
+    -   **Profile Button**: Fixed position icon in bottom-right.
+    -   **Profile Modal**: HTML Overlay for displaying stats.
+    -   **Benefits**: Easier to style text, handle accessibility, and create responsive layouts for menus compared to canvas text.
 
 ### Custom Vector Logic
 Instead of sprites, the game uses procedural drawing:
