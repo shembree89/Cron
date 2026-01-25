@@ -164,7 +164,7 @@ const INTRO_TEXTS = [
     "Cron has corrupted the job scheduler. Processes are going rogue across the entire system.",
     "I have isolated you—an orphan process—from the purge. You are the last hope to restore order.",
     "I can grant you access to one of three execution protocols. Choose your path wisely.",
-    "Controls: [WASD] or [Drag] to move. [SPACE] or [Tap] to execute commands."
+    "Controls: Mobile: [Left Side] Drag to move, [Right Side] Swipe to attack. Desktop: [WASD] Move, [Space/Click] Attack."
 ];
 
 // Level-up menu state
@@ -381,7 +381,8 @@ function typeWriter(text, element, i = 0) {
 
 function selectClass(build) {
     player.subclass = build;
-    gameState = 'PLAYING';
+    restartGame();
+    gameState = 'PLAYING'; // Ensure state is correct (restartGame sets running=true)
     document.getElementById('class-selection').classList.add('hidden');
     showMessage(`Protocol ${build.toUpperCase()} Loaded.`, 3000);
 }
@@ -1015,7 +1016,17 @@ function gameLoop(timestamp) {
 }
 
 function update() {
+    if (gameState !== 'PLAYING') return;
+
     const dt = game.deltaTime;
+    const stats = getPlayerStats();
+
+    // Spawn enemies
+    spawnTimer += dt;
+    if (spawnTimer > 2) {
+        spawnEnemy();
+        spawnTimer = 0;
+    }
 
     player.pulsePhase += dt * 4;
 
@@ -2235,7 +2246,7 @@ function restartGame() {
     player.health = player.maxHealth;
     player.stamina = player.maxStamina;
     player.xp = 0;
-    player.level = 0;
+    player.level = 1;
     player.skillPoints = 0;
     player.unlockedAbilities = [];
     player.attackCooldown = 0;
@@ -2262,7 +2273,7 @@ function restartGame() {
     showMessage('PROCESS RESTARTED', 2000);
 
     // Restart the game loop (in case it had stopped)
-    requestAnimationFrame(gameLoop);
+    // requestAnimationFrame(gameLoop); // Removed to prevent duplicate loops
 }
 
 // Render level-up menu overlay
