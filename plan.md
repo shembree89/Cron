@@ -14,6 +14,14 @@ The Kernel serves as the player's guide and narrator throughout the game. In the
 ---
 
 ## Player
+### Current Design (V5)
+The player is a custom **Hexagonal Molecular Chip**:
+- **Outer Frame**: Cyan hexagon. Left side = XP, Right side = Stamina.
+- **Inner Core**: Smaller filled hexagon pattern that shares the **Front** vertex with the outer frame (creating a pointer).
+- **Health**: Magenta background fill of the Inner Core. Drains **Front-to-Back** (pointer empties first).
+- **XP Bar (Left)**: Electric Blue solid bar wrapping Back->TopLeft->Front. Fills from Back to Front.
+- **Stamina Bar (Right)**: Green solid bar wrapping Front->BottomRight->Back. Drains Front to Back (anchored at Back).
+- **Visuals**: Perimeter bars stop at ~85% to Front to leave a gap. Inner core has a static molecular network overlay.
 
 ### Player Stats
 | Stat | Description |
@@ -274,6 +282,9 @@ Different shells could be:
 
 ## MVP Scope (First Playable)
 1. **Home directory hub** with basic movement and one NPC (Kernel)
+   - [x] Basic movement/controls
+   - [x] Player rendering (V5 Design)
+   - [ ] Hub area
 2. **Block-based terrain** with `1`/`0` visuals
 3. **One combat zone** (`/tmp/`) with Zombie Process enemies
 4. **Resource drops** — Bits from terrain, Bytes from enemies
@@ -282,6 +293,8 @@ Different shells could be:
    - `rm` — Destroy terrain (drops Bits)
    - `touch` — Create single block (costs Bits)
 6. **Simple health/stamina** (ROM/RAM)
+   - [x] Visual Bars implemented
+   - [ ] Logic/Regen tuning
 7. **Basic enemy AI** and collision
 8. **One mini-boss**
 
