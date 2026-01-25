@@ -1452,7 +1452,7 @@ function drawDataPacket(a) {
 function drawPlayer() {
     const { x, y, size, invulnerable, pulsePhase, facingAngle, health, maxHealth, stamina, maxStamina, xp, level } = player;
 
-    // XP progress calculation: what fraction of current level is complete
+    // Calculate ratios
     const prevLevelXP = level > 0 ? XP_MILESTONES[level - 1] || 0 : 0;
     const nextLevelXP = level < XP_MILESTONES.length ? XP_MILESTONES[level] : XP_MILESTONES[XP_MILESTONES.length - 1];
     const xpForThisLevel = nextLevelXP - prevLevelXP;
@@ -1472,138 +1472,194 @@ function drawPlayer() {
 
     const s = size * pulse;
 
-    // Define pointed hex vertices (fat front, pointy tail)
-    // Vertices go clockwise: front, front-top, back-top, tail, back-bottom, front-bottom
-    const vertices = [
-        { x: s * 1.0, y: 0 },             // 0: front center
-        { x: s * 0.6, y: -s * 0.7 },      // 1: front-top (left side)
-        { x: -s * 0.5, y: -s * 0.6 },     // 2: back-top (left side)
-        { x: -s * 1.1, y: 0 },            // 3: tail (pointy back)
-        { x: -s * 0.5, y: s * 0.6 },      // 4: back-bottom (right side)
-        { x: s * 0.6, y: s * 0.7 }        // 5: front-bottom (right side)
-    ];
-
-    // The shape spans from x = -1.1s (tail) to x = 1.0s (front)
-    // Total width = 2.1s
-    // Front-to-back drain: at full, show entire shape; at low, show only back portion
-    const totalWidth = s * 2.1;
-    const tailX = -s * 1.1;
-
-    // Draw health fill (left half, y < 0)
-    // Drains front-to-back: full health shows entire left half, low health shows only tail area
-    ctx.save();
-    const healthWidth = totalWidth * healthRatio;
-    const healthClipRight = tailX + healthWidth; // Right edge of health clip
-    ctx.beginPath();
-    ctx.rect(tailX, -s, healthWidth, s); // Clip from tail toward front
-    ctx.clip();
-
-    ctx.beginPath();
-    ctx.moveTo(vertices[0].x, vertices[0].y);
-    ctx.lineTo(vertices[1].x, vertices[1].y);
-    ctx.lineTo(vertices[2].x, vertices[2].y);
-    ctx.lineTo(vertices[3].x, vertices[3].y);
-    ctx.lineTo(0, 0);
-    ctx.closePath();
-    ctx.fillStyle = COLORS.magenta;
-    ctx.globalAlpha = 0.7;
-    ctx.fill();
-    ctx.restore();
-
-    // Reset alpha
-    ctx.globalAlpha = (invulnerable > 0 && Math.floor(invulnerable * 20) % 2 === 0) ? 0.4 : 1;
-
-    // Draw stamina fill (right half, y > 0)
-    // Drains front-to-back: full stamina shows entire right half, low stamina shows only tail area
-    ctx.save();
-    const staminaWidth = totalWidth * staminaRatio;
-    ctx.beginPath();
-    ctx.rect(tailX, 0, staminaWidth, s); // Clip from tail toward front
-    ctx.clip();
-
-    ctx.beginPath();
-    ctx.moveTo(vertices[0].x, vertices[0].y);
-    ctx.lineTo(vertices[5].x, vertices[5].y);
-    ctx.lineTo(vertices[4].x, vertices[4].y);
-    ctx.lineTo(vertices[3].x, vertices[3].y);
-    ctx.lineTo(0, 0);
-    ctx.closePath();
-    ctx.fillStyle = COLORS.green;
-    ctx.globalAlpha = 0.7;
-    ctx.fill();
-    ctx.restore();
-
-    // Reset alpha
-    if (invulnerable > 0 && Math.floor(invulnerable * 20) % 2 === 0) {
-        ctx.globalAlpha = 0.4;
-    } else {
-        ctx.globalAlpha = 1;
+    // Regular hexagon vertices (pointy-top orientation for "front")
+    // Front is at angle 0 (right), back is at angle PI (left)
+    const hexVerts = [];
+    for (let i = 0; i < 6; i++) {
+        const angle = (i * Math.PI / 3) - Math.PI / 6; // Start from top-right
+        hexVerts.push({
+            x: Math.cos(angle) * s,
+            y: Math.sin(angle) * s
+        });
     }
 
-    // Draw main shape outline (bright cyan - the "unfilled" XP state)
+    // === OUTER HEXAGON FRAME ===
     ctx.beginPath();
-    ctx.moveTo(vertices[0].x, vertices[0].y);
-    for (let i = 1; i < vertices.length; i++) {
-        ctx.lineTo(vertices[i].x, vertices[i].y);
+    ctx.moveTo(hexVerts[0].x, hexVerts[0].y);
+    for (let i = 1; i < 6; i++) {
+        ctx.lineTo(hexVerts[i].x, hexVerts[i].y);
     }
     ctx.closePath();
     ctx.strokeStyle = COLORS.cyan;
     ctx.lineWidth = 2;
     ctx.shadowColor = COLORS.cyan;
-    ctx.shadowBlur = 6 * pulse;
+    ctx.shadowBlur = 8 * pulse;
     ctx.stroke();
 
-    // Draw XP progress along shape outline (fills CLOCKWISE with visible color)
-    if (xpProgress > 0) {
-        const totalVerts = vertices.length;
-        const progressVerts = xpProgress * totalVerts;
+    // === LEFT CHEVRON BAR (XP - fills bottom to top) ===
+    // Draw chevrons along the left inner edge
+    const chevronCount = 5;
+    const leftStart = hexVerts[3]; // bottom-left
+    const leftEnd = hexVerts[2];   // top-left
+    const chevronInset = s * 0.15;
+    const chevronWidth = s * 0.12;
+
+    for (let i = 0; i < chevronCount; i++) {
+        const t1 = i / chevronCount;
+        const t2 = (i + 0.8) / chevronCount;
+        const tMid = (t1 + t2) / 2;
+
+        // Chevron pointing inward (toward center)
+        const x1 = leftStart.x + (leftEnd.x - leftStart.x) * t1;
+        const y1 = leftStart.y + (leftEnd.y - leftStart.y) * t1;
+        const x2 = leftStart.x + (leftEnd.x - leftStart.x) * t2;
+        const y2 = leftStart.y + (leftEnd.y - leftStart.y) * t2;
+        const xMid = leftStart.x + (leftEnd.x - leftStart.x) * tMid + chevronInset;
+        const yMid = leftStart.y + (leftEnd.y - leftStart.y) * tMid;
 
         ctx.beginPath();
-        ctx.moveTo(vertices[0].x, vertices[0].y);
+        ctx.moveTo(x1 + chevronWidth * 0.3, y1);
+        ctx.lineTo(xMid, yMid);
+        ctx.lineTo(x2 + chevronWidth * 0.3, y2);
 
-        // Go backwards through vertices for clockwise fill (vertices are defined clockwise)
-        for (let i = 0; i < Math.floor(progressVerts); i++) {
-            const nextIdx = (totalVerts - i - 1 + totalVerts) % totalVerts;
-            if (i === 0) {
-                ctx.lineTo(vertices[totalVerts - 1].x, vertices[totalVerts - 1].y);
-            } else {
-                ctx.lineTo(vertices[nextIdx].x, vertices[nextIdx].y);
-            }
+        // Fill based on XP progress (fills from bottom to top)
+        const chevronFillThreshold = (i + 1) / chevronCount;
+        if (xpProgress >= chevronFillThreshold) {
+            ctx.strokeStyle = '#4488ff'; // Bright blue when filled
+            ctx.lineWidth = 2.5;
+            ctx.shadowColor = '#4488ff';
+            ctx.shadowBlur = 6;
+        } else if (xpProgress > i / chevronCount) {
+            // Partially filled
+            ctx.strokeStyle = '#2266aa';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 3;
+        } else {
+            ctx.strokeStyle = 'rgba(0, 150, 150, 0.3)'; // Dim when empty
+            ctx.lineWidth = 1.5;
+            ctx.shadowBlur = 0;
         }
-
-        // Partial edge
-        if (progressVerts % 1 > 0 && Math.floor(progressVerts) < totalVerts) {
-            const currIdx = (totalVerts - Math.floor(progressVerts)) % totalVerts;
-            const prevIdx = (currIdx + 1) % totalVerts;
-            const partial = progressVerts % 1;
-            ctx.lineTo(
-                vertices[prevIdx].x + (vertices[currIdx].x - vertices[prevIdx].x) * partial,
-                vertices[prevIdx].y + (vertices[currIdx].y - vertices[prevIdx].y) * partial
-            );
-        }
-
-        ctx.strokeStyle = '#4488ff'; // Electric blue for XP progress
-        ctx.lineWidth = 3;
-        ctx.shadowColor = '#4488ff';
-        ctx.shadowBlur = 8;
         ctx.stroke();
     }
 
-    // Center core (pulsing)
+    // === RIGHT CHEVRON BAR (Stamina - drains top to bottom) ===
+    const rightStart = hexVerts[0]; // top-right
+    const rightEnd = hexVerts[5];   // bottom-right
+
+    for (let i = 0; i < chevronCount; i++) {
+        const t1 = i / chevronCount;
+        const t2 = (i + 0.8) / chevronCount;
+        const tMid = (t1 + t2) / 2;
+
+        // Chevron pointing inward (toward center)
+        const x1 = rightStart.x + (rightEnd.x - rightStart.x) * t1;
+        const y1 = rightStart.y + (rightEnd.y - rightStart.y) * t1;
+        const x2 = rightStart.x + (rightEnd.x - rightStart.x) * t2;
+        const y2 = rightStart.y + (rightEnd.y - rightStart.y) * t2;
+        const xMid = rightStart.x + (rightEnd.x - rightStart.x) * tMid - chevronInset;
+        const yMid = rightStart.y + (rightEnd.y - rightStart.y) * tMid;
+
+        ctx.beginPath();
+        ctx.moveTo(x1 - chevronWidth * 0.3, y1);
+        ctx.lineTo(xMid, yMid);
+        ctx.lineTo(x2 - chevronWidth * 0.3, y2);
+
+        // Fill based on Stamina (drains from top to bottom = top chevrons empty first)
+        const chevronFillThreshold = 1 - (i / chevronCount);
+        if (staminaRatio >= chevronFillThreshold) {
+            ctx.strokeStyle = COLORS.green; // Bright green when filled
+            ctx.lineWidth = 2.5;
+            ctx.shadowColor = COLORS.green;
+            ctx.shadowBlur = 6;
+        } else if (staminaRatio > 1 - ((i + 1) / chevronCount)) {
+            // Partially filled
+            ctx.strokeStyle = '#006600';
+            ctx.lineWidth = 2;
+            ctx.shadowBlur = 3;
+        } else {
+            ctx.strokeStyle = 'rgba(0, 150, 0, 0.3)'; // Dim when empty
+            ctx.lineWidth = 1.5;
+            ctx.shadowBlur = 0;
+        }
+        ctx.stroke();
+    }
+
+    // === CENTER MOLECULAR NETWORK (Health - drains top to bottom) ===
+    // Inner hexagon with connected nodes
+    const innerScale = 0.55;
+    const innerHex = hexVerts.map(v => ({ x: v.x * innerScale, y: v.y * innerScale }));
+
+    // Center node
+    const centerNode = { x: 0, y: 0 };
+
+    // Draw connections from center to each vertex
+    ctx.shadowBlur = 0;
+    for (let i = 0; i < 6; i++) {
+        ctx.beginPath();
+        ctx.moveTo(centerNode.x, centerNode.y);
+        ctx.lineTo(innerHex[i].x, innerHex[i].y);
+
+        // Health determines which connections are lit (drains top to bottom)
+        // Top is negative Y, bottom is positive Y
+        const vertY = innerHex[i].y;
+        const normalizedY = (vertY + s * innerScale) / (2 * s * innerScale); // 0 = top, 1 = bottom
+
+        if (healthRatio >= (1 - normalizedY)) {
+            ctx.strokeStyle = COLORS.magenta;
+            ctx.lineWidth = 2;
+            ctx.shadowColor = COLORS.magenta;
+            ctx.shadowBlur = 5;
+        } else {
+            ctx.strokeStyle = 'rgba(255, 0, 255, 0.2)';
+            ctx.lineWidth = 1;
+            ctx.shadowBlur = 0;
+        }
+        ctx.stroke();
+    }
+
+    // Draw inner hexagon edges
+    ctx.beginPath();
+    ctx.moveTo(innerHex[0].x, innerHex[0].y);
+    for (let i = 1; i < 6; i++) {
+        ctx.lineTo(innerHex[i].x, innerHex[i].y);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = healthRatio > 0.3 ? COLORS.magenta : 'rgba(255, 0, 255, 0.3)';
+    ctx.lineWidth = 1.5;
+    ctx.shadowColor = COLORS.magenta;
+    ctx.shadowBlur = healthRatio > 0.3 ? 4 : 0;
+    ctx.stroke();
+
+    // Draw nodes at each vertex
+    for (let i = 0; i < 6; i++) {
+        const vertY = innerHex[i].y;
+        const normalizedY = (vertY + s * innerScale) / (2 * s * innerScale);
+        const isLit = healthRatio >= (1 - normalizedY);
+
+        ctx.beginPath();
+        ctx.arc(innerHex[i].x, innerHex[i].y, 3, 0, Math.PI * 2);
+        ctx.fillStyle = isLit ? COLORS.magenta : 'rgba(255, 0, 255, 0.3)';
+        ctx.shadowColor = COLORS.magenta;
+        ctx.shadowBlur = isLit ? 8 : 0;
+        ctx.fill();
+    }
+
+    // Center node (always lit if any health)
     ctx.beginPath();
     ctx.arc(0, 0, 4 * pulse, 0, Math.PI * 2);
-    ctx.fillStyle = COLORS.cyan;
-    ctx.shadowBlur = 10;
+    ctx.fillStyle = healthRatio > 0 ? COLORS.cyan : 'rgba(0, 255, 255, 0.3)';
+    ctx.shadowColor = COLORS.cyan;
+    ctx.shadowBlur = healthRatio > 0 ? 10 : 0;
     ctx.fill();
 
-    // Attack direction indicator
+    // === ATTACK DIRECTION INDICATOR ===
     if (player.attacking) {
         ctx.rotate(-facingAngle + player.attackAngle);
         ctx.beginPath();
-        ctx.moveTo(s * 1.3, 0);
-        ctx.lineTo(s * 1.6, -5);
-        ctx.lineTo(s * 1.8, 0);
-        ctx.lineTo(s * 1.6, 5);
+        ctx.moveTo(s * 1.2, 0);
+        ctx.lineTo(s * 1.5, -4);
+        ctx.lineTo(s * 1.7, 0);
+        ctx.lineTo(s * 1.5, 4);
         ctx.closePath();
         ctx.fillStyle = COLORS.cyan;
         ctx.shadowBlur = 12;
