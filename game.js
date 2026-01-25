@@ -2248,6 +2248,8 @@ function restartGame() {
     // Reset player
     player.x = game.worldWidth / 2;
     player.y = game.worldHeight / 2;
+    player.maxHealth = 100;
+    player.maxStamina = 100;
     player.health = player.maxHealth;
     player.stamina = player.maxStamina;
     player.xp = 0;
@@ -2255,6 +2257,7 @@ function restartGame() {
     player.skillPoints = 0;
     player.unlockedAbilities = [];
     player.attackCooldown = 0;
+    player.auraTimer = 0; // Reset aura
 
     // Clear entities
     enemies.length = 0;
@@ -2272,7 +2275,7 @@ function restartGame() {
     levelUpMenu.availableAbilities = [];
 
     // Regenerate terrain and spawn enemies
-    generateTerrain();
+    generateBlocks();
     for (let i = 0; i < 5; i++) spawnEnemy();
 
     showMessage('PROCESS RESTARTED', 2000);
