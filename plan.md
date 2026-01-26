@@ -291,6 +291,9 @@ Different shells could be:
    - [ ] Hub area
 2. **Block-based terrain** with `1`/`0` visuals
 3. **One combat zone** (`/tmp/`) with Zombie Process enemies
+   - [x] Basic enemy AI and collision
+   - [x] Class selection (Bash, Ping, Init) implemented
+   - [x] Mobile touch controls
 4. **Resource drops** — Bits from terrain, Bytes from enemies
 5. **Core commands:**
    - `kill` — Attack enemies

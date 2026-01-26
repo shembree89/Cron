@@ -1,0 +1,4 @@
+Blake is a beta tester. The following are his findings by date/time.
+
+1-25
+-7pm: ping build taking the increased projectile speed ability may also be increasing movement speed

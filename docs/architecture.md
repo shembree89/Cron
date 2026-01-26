@@ -45,3 +45,14 @@ Standard `requestAnimationFrame` loop:
 - `index.html`: Entry point.
 - `style.css`: Minimal styling.
 - `game.js`: Monolithic game logic (to be split as project grows).
+
+## Testing Strategy
+To avoid deployment delays and caching issues, all development testing should be performed locally.
+
+### Local Testing Workflow
+1.  Navigate to project root: `cd /home/casper/Code/Cron`
+2.  Start local server: `python3 -m http.server 8080` (or `npx http-server`)
+3.  Access game: `http://localhost:8080/`
+4.  Verify changes immediately.
+
+**Note:** Do not rely on GitHub Pages deployment for debugging. Only push to master (`git push`) when features are verified locally.
