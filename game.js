@@ -14,6 +14,10 @@ const closeProfileBtn = document.getElementById('close-profile');
 const uiElements = {
     health: document.getElementById('profile-health'),
     stamina: document.getElementById('profile-stamina'),
+    compute: document.getElementById('profile-compute'),
+    clock: document.getElementById('profile-clock'),
+    memory: document.getElementById('profile-memory'),
+    bandwidth: document.getElementById('profile-bandwidth'),
     xp: document.getElementById('profile-xp'),
     bits: document.getElementById('profile-bits'),
     bytes: document.getElementById('profile-bytes'),
@@ -91,37 +95,46 @@ const SKILL_TREE = {
     bash: {
         name: 'Bash',
         color: '#ff6600',
-        description: 'Melee combat - high risk, high reward',
+        description: 'Melee - /bin/bash',
         abilities: [
-            { id: 'kill-f', name: 'kill -f', desc: 'Force kill: +50% melee damage', tier: 1, effect: { meleeDamage: 1.5 } },
-            { id: 'kill-9', name: 'kill -9', desc: 'SIGKILL: Instant kill enemies below 20% HP', tier: 2, requires: 'kill-f', effect: { executeThreshold: 0.2 } },
-            { id: 'chmod-x', name: 'chmod +x', desc: 'Execute permission: +25% attack speed', tier: 2, requires: 'kill-f', effect: { attackSpeed: 0.75 } },
-            { id: 'sudo-bash', name: 'sudo bash', desc: 'Root shell: Double damage, costs 2x stamina', tier: 3, requires: 'kill-9', effect: { sudoMode: true } },
-            { id: 'rm-rf', name: 'rm -rf', desc: 'Recursive force: Attacks hit in a cone', tier: 3, requires: 'chmod-x', effect: { coneAttack: true } }
+            // Tier 1 (Common)
+            { id: 'bashrc', name: '.bashrc', desc: 'Config: +2 Compute (Damage)', tier: 1, effect: { stats: { compute: 2 } } },
+            // Path: Force (Juggernaut)
+            { id: 'mount', name: 'mount', desc: '[Force] Mounting: +5 Memory (Health)', tier: 2, requires: 'bashrc', effect: { stats: { memory: 5 } } },
+            { id: 'sudo', name: 'sudo', desc: '[Force] Superuser: Reflect 20% damage', tier: 3, requires: 'mount', effect: { reflect: 0.2 } },
+            // Path: Brute (Berserker)
+            { id: 'nice', name: 'nice -n -20', desc: '[Brute] High Priority: +5 Compute, -2 Memory', tier: 2, requires: 'bashrc', effect: { stats: { compute: 5, memory: -2 } } },
+            { id: 'panic', name: 'kernel_panic', desc: '[Brute] Panic: Dmg increases as Health drops', tier: 3, requires: 'nice', effect: { lowHpDamage: true } }
         ]
     },
     ping: {
         name: 'Ping',
         color: '#00ff00',
-        description: 'Ranged combat - precision and stealth',
+        description: 'Ranged - /usr/bin/ping',
         abilities: [
-            { id: 'ping-c', name: 'ping -c', desc: 'Count: Projectiles pierce 1 enemy', tier: 1, effect: { pierce: 1 } },
-            { id: 'ping-i', name: 'ping -i', desc: 'Interval: Faster projectile speed', tier: 2, requires: 'ping-c', effect: { projectileSpeed: 1.5 } },
-            { id: 'curl-s', name: 'curl -s', desc: 'Silent: Move faster while not attacking', tier: 2, requires: 'ping-c', effect: { stealthSpeed: 1.3 } },
-            { id: 'ssh-p', name: 'ssh -p', desc: 'Port forward: Projectiles bounce off walls', tier: 3, requires: 'ping-i', effect: { bounceShots: true } },
-            { id: 'wget-q', name: 'wget -q', desc: 'Quiet mode: Attacks don\'t alert nearby enemies', tier: 3, requires: 'curl-s', effect: { silentKills: true } }
+            // Tier 1 (Common)
+            { id: 'ping-c', name: 'ping -c', desc: 'Count: +2 Clock (Speed)', tier: 1, effect: { stats: { clock: 2 } } },
+            // Path: Echo (Sniper)
+            { id: 'traceroute', name: 'traceroute', desc: '[Echo] Trace: +5 Bandwidth (Range/Util)', tier: 2, requires: 'ping-c', effect: { stats: { bandwidth: 5 } } },
+            { id: 'packet-loss', name: 'packet_loss', desc: '[Echo] Loss: Projectiles phase through walls', tier: 3, requires: 'traceroute', effect: { phaseWalls: true } },
+            // Path: Flood (Skirmisher)
+            { id: 'ddos', name: 'ddos', desc: '[Flood] Denial: +5 Clock, -2 Compute', tier: 2, requires: 'ping-c', effect: { stats: { clock: 5, compute: -2 } } },
+            { id: 'async', name: 'async_io', desc: '[Flood] Async: No move penalty while attacking', tier: 3, requires: 'ddos', effect: { moveWhileAttacking: true } }
         ]
     },
     init: {
         name: 'Init',
         color: '#ff00ff',
-        description: 'Summoner/AoE - spawn processes to fight for you',
+        description: 'Summoner - /sbin/init',
         abilities: [
-            { id: 'fork-n', name: 'fork -n', desc: 'New process: Spawn a helper drone', tier: 1, effect: { maxDrones: 1 } },
-            { id: 'fork-d', name: 'fork -d', desc: 'Daemon mode: Drones last longer', tier: 2, requires: 'fork-n', effect: { droneDuration: 2 } },
-            { id: 'nohup', name: 'nohup', desc: 'No hangup: Drones don\'t die when you\'re hit', tier: 2, requires: 'fork-n', effect: { persistentDrones: true } },
-            { id: 'xargs-p', name: 'xargs -P', desc: 'Parallel: Spawn 2 drones at once', tier: 3, requires: 'fork-d', effect: { maxDrones: 3 } },
-            { id: 'systemctl', name: 'systemctl', desc: 'Service manager: Drones auto-respawn', tier: 3, requires: 'nohup', effect: { autoRespawn: true } }
+            // Tier 1 (Common)
+            { id: 'fork', name: 'fork', desc: 'Process: +2 Bandwidth (Efficiency)', tier: 1, effect: { stats: { bandwidth: 2 } } },
+            // Path: Daemon (Summoner)
+            { id: 'daemon', name: 'daemon', desc: '[Daemon] Background: +1 Max Drone', tier: 2, requires: 'fork', effect: { maxDrones: 1 } },
+            { id: 'zombie', name: 'zombie_reaper', desc: '[Daemon] Reaper: Drones explode on death', tier: 3, requires: 'daemon', effect: { droneExplode: true } },
+            // Path: Service (Controller)
+            { id: 'systemd', name: 'systemd', desc: '[Service] Manager: +5 Memory (Survival)', tier: 2, requires: 'fork', effect: { stats: { memory: 5 } } },
+            { id: 'cron', name: 'cron_job', desc: '[Service] Automation: Periodic auto-heal', tier: 3, requires: 'systemd', effect: { autoHeal: true } }
         ]
     }
 };
@@ -131,13 +144,20 @@ const player = {
     x: 0,
     y: 0,
     size: 24,
-    speed: 250,
+    speed: 250, // Base speed, modified by Clock
     health: 100,
-    maxHealth: 100,
+    // maxHealth derived from Memory
     stamina: 100,
-    maxStamina: 100,
+    // maxStamina derived from Memory
     xp: 0,
     level: 1,
+    // Core Stats (Combat D&D System)
+    stats: {
+        compute: 10,    // Power: Damage, Knockback
+        clock: 10,      // Speed: Attack Speed, Move Speed, Crit
+        memory: 10,     // Stability: Health, Stamina
+        bandwidth: 10   // Efficiency: Cooldowns, AoE, Utility
+    },
     skillPoints: 0,
     subclass: null, // 'bash', 'ping', 'init'
     unlockedAbilities: [], // Array of ability IDs
@@ -755,6 +775,16 @@ function unlockAbility(ability) {
 
     player.skillPoints--;
     player.unlockedAbilities.push(ability.id);
+
+    // Apply immediate stat effects
+    if (ability.effect && ability.effect.stats) {
+        for (const [stat, value] of Object.entries(ability.effect.stats)) {
+            if (player.stats[stat] !== undefined) {
+                player.stats[stat] += value;
+            }
+        }
+    }
+
     showMessage(`Unlocked: ${ability.name}`, 2000);
 
     // Close menu if no more skill points
@@ -791,11 +821,34 @@ function hasAbility(abilityId) {
 
 // Get computed player stats based on abilities
 function getPlayerStats() {
+    const s = player.stats;
+
+    // Derived Stats
+    // Health: Base 50 + (Memory * 5) -> 100 at start
+    const maxHealth = 50 + (s.memory * 5);
+
+    // Stamina: Base 50 + (Memory * 5) -> 100 at start
+    const maxStamina = 50 + (s.memory * 5);
+
+    // Damage: Base 10 + (Compute * 0.5) -> 15 at start
+    let damage = 10 + (s.compute * 0.5);
+
+    // Move Speed: Base 200 + (Clock * 5) -> 250 at start
+    let moveSpeed = 200 + (s.clock * 5);
+
+    // Attack Speed (Cooldown): Base 0.4s - (Bandwidth * 0.01) -> 0.3s at start
+    let attackCooldown = Math.max(0.1, 0.4 - (s.bandwidth * 0.01));
+
+    // Projectile Speed: Base 500 + (Clock * 20) -> 700 at start
+    let projectileSpeed = 500 + (s.clock * 20);
+
     let stats = {
-        damage: 15,
-        attackSpeed: 0.3,  // cooldown in seconds
-        projectileSpeed: 700,
-        moveSpeed: player.speed,
+        damage: damage,
+        attackSpeed: attackCooldown,
+        projectileSpeed: projectileSpeed,
+        moveSpeed: moveSpeed,
+        maxHealth: maxHealth,
+        maxStamina: maxStamina,
         pierce: 0,
         executeThreshold: 0,
         coneAttack: false,
@@ -1502,8 +1555,14 @@ function toggleProfile() {
 function updateProfileView() {
     const nextLevelXP = player.level < XP_MILESTONES.length ? XP_MILESTONES[player.level] : 'MAX';
 
-    uiElements.health.textContent = `${Math.floor(player.health)} / ${player.maxHealth}`;
-    uiElements.stamina.textContent = `${Math.floor(player.stamina)} / ${player.maxStamina}`;
+    uiElements.health.textContent = `${Math.floor(player.health)} / ${Math.floor(player.stats.memory * 5 + 50)}`; // Calc max health on fly or use derived stats
+    uiElements.stamina.textContent = `${Math.floor(player.stamina)} / ${Math.floor(player.stats.memory * 5 + 50)}`;
+
+    uiElements.compute.textContent = player.stats.compute;
+    uiElements.clock.textContent = player.stats.clock;
+    uiElements.memory.textContent = player.stats.memory;
+    uiElements.bandwidth.textContent = player.stats.bandwidth;
+
     uiElements.xp.textContent = `${player.xp} / ${nextLevelXP} (Lvl ${player.level})`;
     uiElements.bits.textContent = player.bits;
     uiElements.bytes.textContent = player.bytes;

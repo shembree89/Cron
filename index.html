@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Cron - The Process Wars</title>
-    <link rel="stylesheet" href="style.css?v=25">
+    <link rel="stylesheet" href="style.css?v=26">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
 </head>
@@ -75,6 +75,23 @@
             </div>
             <div class="profile-content">
                 <div class="stat-row">
+                    <span class="label" style="color:var(--orange)">COMPUTE (Power)</span>
+                    <span class="value" id="profile-compute">10</span>
+                </div>
+                <div class="stat-row">
+                    <span class="label" style="color:var(--green)">CLOCK (Speed)</span>
+                    <span class="value" id="profile-clock">10</span>
+                </div>
+                <div class="stat-row">
+                    <span class="label" style="color:var(--magenta)">MEMORY (Stability)</span>
+                    <span class="value" id="profile-memory">10</span>
+                </div>
+                <div class="stat-row">
+                    <span class="label" style="color:var(--cyan)">BANDWIDTH (Tech)</span>
+                    <span class="value" id="profile-bandwidth">10</span>
+                </div>
+                <div class="stat-row" style="margin-top: 10px; border-top: 1px dashed var(--cyan-dim);"></div>
+                <div class="stat-row">
                     <span class="label">ROM (Health)</span>
                     <span class="value" id="profile-health">100/100</span>
                 </div>
@@ -101,7 +118,7 @@
             </div>
         </div>
     </div>
-    <script src="game.js?v=25"></script>
+    <script src="game.js?v=26"></script>
     <script>
         // Register service worker for PWA
         if ('serviceWorker' in navigator) {
