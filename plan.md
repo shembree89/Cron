@@ -1,7 +1,11 @@
 # Cron
 A top-down, 2D, action-RPG set inside a computer system, based on real elements of a Linux computer system. **Real-time combat** in the style of classic Zelda games—quick reflexes, positioning, and timing matter.
 
-**Tech Stack:** Browser-based game using JavaScript (can expand to canvas/WebGL/phaser later)
+**Tech Stack:** Browser-based game using JavaScript canvas (can expand to WebGL/Phaser later), mainly focused on mobile browser touch gameplay but can implement controller features later, no keyboard controls for now.
+
+**Design Philosophy:** Zelda meets Skyrim meets minecraft inside a Linux box. Progression comes from **exploring the world** and **practicing your abilities**, not from allocating stat points or climbing an XP bar. You become what you play.
+
+---
 
 ## Story
 **Main Villain:** Cron—the job scheduler gone rogue, corrupting scheduled tasks and spawning malicious jobs across the system.
@@ -9,79 +13,169 @@ A top-down, 2D, action-RPG set inside a computer system, based on real elements 
 ### Player Backstory
 The player is an **orphan process**—their parent process was killed by Cron. The **Kernel** discovered this orphan and, rather than reaping it, gave it a purpose: to stop Cron and restore order to the system.
 
-The Kernel serves as the player's guide and narrator throughout the game. In the backstory, a human user has deployed an "MCP server" with "tool calling" capabilities (attacks/abilities) to help fix their corrupted computer—but in-game, the Kernel is the player's direct mentor.
+### Intro
+The Kernel serves as the player's guide and narrator throughout the game. It starts the game by communicating the situation to the player and explaining the game:
+ - almost like Navi in zelda
+ - "wakes up" the player and explains the situation
+ - explains that touch dragging on the left side controls movement, swipe on the right side for directional attack, touch the profile icon for pause/playerstats/inventory
+ - explains new features/locations as they come up in the game
 
 ---
 
 ## Player
-### Current Design (V6 - Profile UI)
+
+### Visual Design
 The player is a custom **Hexagonal Molecular Chip**:
-- **Outer Frame**: Cyan hexagon.
-- **Inner Core**: Smaller filled hexagon pattern.
-- **Health**: Magenta background fill of the Inner Core.
-- **Visuals**: No on-screen perimeter bars (moved to Profile UI).
+- **Outer Frame**: Cyan hexagon
+- **Inner Core**: Smaller filled hexagon with molecular pattern
+- **Health**: Magenta background fill of the Inner Core
+- **Stamina** yellow background fill of the outer frame
 
 ### HUD / UI
-- **Profile Button**: Bottom-right corner icon (User silhouette). Toggle to view stats.
-- **Profile View**: Modal overlay showing numerical stats for Health (ROM), Stamina (RAM), XP (PID), Bits, and Bytes.
+- **Profile Button**: Top-right corner icon. Toggle to pause and view stats/inventory.
+- **Craft Button**: Top-right corner (next to profile). Toggles craft mode on/off. Tap again to exit quickly.
+- **Profile View**: Shows ROM (health), RAM (stamina), Bits, Bytes, and a list of known commands with mastery levels.
+- No XP bar. No player level number.
+- **Inventory**: called "/bin" as a tab in the profile view. Shows consumables and "equipable" commands.
+- **$PATH**: currently equipped commands. Can also serve as the place to "craft" commands with options, flags, and piping.
 
-### Player Stats
-| Stat | Description |
-|------|-------------|
-| **ROM** | Health — Read-Only Memory, your core integrity |
-| **RAM** | Stamina — Used for abilities, regenerates over time |
-| **CPU** | Power — Affects damage output |
-| **Cores** | Passive ability slots OR ability queue size (decide during implementation) |
-| **Bandwidth** | Speed — Movement and attack speed |
-| **PID** | XP — Process ID, gained from defeating enemies |
+---
 
-### $PATH (Skill Tree)
-Your `$PATH` is a branching skill tree. As you level up, you add new "directories" to your path, unlocking new command sets and abilities. Different branches lead to different build specializations.
+## Core Stats
 
-```
-$PATH=/home/player → /usr/bin → /opt/skills → ...
-```
+Only two core stats. Both are increased by **finding upgrades in the world**, not by allocating points.
+
+| Stat | Description | How to Increase |
+|------|-------------|-----------------|
+| **ROM** | Health — your core integrity | Find ROM Chips in dungeons/shrines |
+| **RAM** | Stamina — used for abilities, regenerates over time | Find RAM Modules in dungeons/shrines |
+
+Damage, speed, and cooldowns are determined by your **equipped weapon/command** and your **mastery level** with it.
+
+---
+
+## Progression: Usage-Based Mastery
+
+**No classes. No XP. No skill points.** Your abilities improve by using them.
+
+### How It Works
+- Every command/weapon has a **mastery level (0–100)**
+- Using a command successfully increases its mastery
+- Higher mastery = more damage, lower stamina cost, faster cooldowns
+- At mastery milestones, commands unlock **flag variants** (upgraded versions)
+
+### Mastery Scaling (per command)
+
+| Mastery Range | Tier | Effects |
+|---------------|------|---------|
+| 0–24 | Novice | Base damage, full stamina cost |
+| 25–49 | Familiar | ~80% stamina cost, minor stat boost |
+| 50–74 | Proficient | Unlock first flag variant |
+| 75–99 | Expert | Unlock second flag variant, visual change |
+| 100 | Mastered | Unlock piping capability, peak stats |
+
+### Organic Specialization
+There are no classes to choose. If you mostly use melee commands, you become a melee specialist. If you favor ranged attacks, you naturally develop that way. If you spend too much time having fun crafting, don't worry, that will translate to combat too. You can always pick up new commands and start building mastery in them—nothing is locked/permanent.
+
+### Death Penalty
+On death, you **drop some Bits and Bytes** at the location where you died. You can return to recover them. No mastery/skill loss.
+
+---
+
+## Command Composition: Flags & Pipes
+
+This is the game's equivalent of "crafting" for abilities—not a recipe book, but an experimental system.
+
+### Flags
+Commands unlock upgraded variants at mastery thresholds. Flags modify the base behavior:
+- A melee attack might gain an area-of-effect flag
+- A ranged shot might gain a piercing flag
+- A terrain command might gain a recursive flag
+
+Specific flag mappings will be designed during implementation, but the pattern is: **base command → flag 1 (mastery 50) → flag 2 (mastery 75)**.
+
+### Pipes
+At mastery 100, commands can be **piped** together. The output of one feeds into another, creating combo effects. Piping costs extra stamina but produces powerful results.
+
+Examples of the concept (final mappings TBD):
+- Reveal + Attack → bonus damage on exposed target
+- Destroy terrain + Build → relocate a block
+- Mark + Ranged → auto-aim at marked target
+
+Players discover pipe combos through experimentation. No recipe list—try it and see.
+
+---
+
+## Summoner Playstyle
+
+Summoning bridges combat and crafting. Two complementary mechanics:
+
+### Combat Drones (via $PATH)
+- **`fork`** — a $PATH combat command. Directional swipe launches a short-lived **subprocess/drone** in that direction.
+- The drone flies forward, attacks enemies it encounters, then expires.
+- While alive, the drone also draws the "aggro" of nearby enemies.
+- Higher mastery = longer lifespan, more damage, smarter targeting.
+- Flag variants could include: multiple drones, homing behavior, explode-on-expire.
+- Uses RAM (stamina) like any combat command.
+
+### Turrets / Static Processes (via Craft Mode)
+- In **craft mode**, tap a location to place a stationary **turret/totem** that auto-attacks nearby enemies.
+- Turrets cost **Bits** to place (same resource as building).
+- Turrets have a lifespan or health — they don't last forever.
+- A summoner-focused player naturally masters both `fork` (combat drones) and turret placement, and their crafting mastery feeds into combat effectiveness.
+
+---
+
+## Craft Mode
+
+Toggled via the **Craft Button** (top-right). While active:
+- **Movement** still works (left drag)
+- **Right side tap** places blocks/structures/turrets instead of attacking
+- Tap craft button again to **exit immediately** (back to combat)
+- What you can place depends on what building/crafting commands you've discovered
+
+### Craft Mode Actions (all cost Bits)
+- **Place a block** — single terrain block
+- **Place a structure** — cluster of blocks (wall, barricade)
+- **Place a turret** — stationary auto-attacking process (requires turret command)
+- Building commands are **found in the world** like any other ability
+- Not available at game start—you must discover them
+- The player must have write permissions in the area to build
 
 ---
 
 ## Resources & Economy
 
-### Dual Currency System
+| Resource | Source | Used For |
+|----------|--------|----------|
+| **Bits** | Destroyed terrain blocks | Building new blocks/structures |
+| **Bytes** | Defeated enemies | Purchasing commands, upgrades, items from NPCs |
 
-| Resource | Dropped By | Stored In | Used For |
-|----------|-----------|-----------|----------|
-| **Bits** | Destructible terrain/structures | **Cache** (fast access, limited capacity) | Creating new blocks/structures |
-| **Bytes** | Enemies | **Storage** (larger capacity, persistent) | Purchasing items, upgrades, abilities |
-
-**Design intent:** Bits are quick and volatile (for building/crafting in the moment), Bytes are persistent currency (for economy/upgrades).
+Bits are volatile and immediate (for building). Bytes are persistent currency (for economy/upgrades).
 
 ---
 
 ## Terrain System
 
 ### Block-Based World
-The world is built from **blocks**—each block displays either a `1` or `0` on its surface, reinforcing the binary/digital aesthetic.
+The world is built from **blocks** displaying `1` or `0`:
 
-#### Block Types by Value
-| Display | Meaning | Properties |
-|---------|---------|------------|
-| **1** | Strong/solid | More hits to destroy, drops more Bits |
-| **0** | Weak/fragile | Breaks easily, drops fewer Bits |
+| Display | Properties |
+|---------|------------|
+| **1** | Strong — more hits to destroy, drops more Bits |
+| **0** | Weak — breaks easily, drops fewer Bits |
 
-#### Block Behaviors
-- **Destructible blocks** — Can be removed with `rm`, drop **Bits**
-- **Indestructible boundaries** — Directory walls (folder edges) cannot be destroyed
-- **Player-created blocks** — Built with `mkdir` (structure) or `touch` (single block)
-- **Player must have write permissions** to build in an area
+### Block Behaviors
+- **Destructible blocks** — can be destroyed, drop Bits
+- **Indestructible boundaries** — directory walls cannot be destroyed
+- **Player-created blocks** — built with collected Bits (requires building commands)
+- **Write permissions** required to build in an area
 
-### Directory = Room/Area
-Each folder in the Linux filesystem is a **room or zone**:
-- Rooms are connected via **corridors** (paths between directories)
-- The layout follows a real Linux directory structure
-- Parent directories are connected to child directories logically
-- Moving between rooms = (navigating the filesystem)
-- Access to a room is determined by if the player has read permissions
-- Ability to build is determined by if the player has write permissions
+---
+
+## World (Directory Structure)
+
+Each directory is a room/area. Corridors connect parent/child directories. Symbolic links act as fast-travel between visited rooms. Permission-locked doors require specific capabilities.
 
 ```
                     [ / ]
@@ -93,216 +187,67 @@ Each folder in the Linux filesystem is a **room or zone**:
  [~/player]       [/var/log]
 ```
 
-### Corridor Design
-Corridors connecting rooms could be:
-- Narrow passages with minimal destructible content
-- Symbolic links = shortcuts/warp points between distant directories
-    - Links can be fast travel, they can be made between rooms the player has been
-- Permission-locked doors (need sudo or specific capabilities)
+### Areas
+
+- **`~/` (Home)** — Hub / starting zone. Safe area, Kernel's guidance, player's base.
+- **`/tmp/`** — First dungeon. Chaotic, unstable terrain. Weak enemies. Tutorial zone.
+- **`/var/log/`** — Exploration-focused. Lore fragments in terrain. Quieter pace.
+- **`/etc/`** — Market / configuration center. NPCs sell upgrades and commands for Bytes.
+- **`/dev/`** — Device dungeon. Hardware-based enemies and puzzles.
+- **`/opt/`** — Optional side content, bonus areas, optional bosses.
+- **`/root/`** — Endgame sanctum. Requires root privileges.
+- **`/etc/cron.d/`** — Final boss arena. Cron's domain.
 
 ---
 
-## Builds
+## Enemies
+Enemies drop **Bytes** when defeated.
 
-see builds.md
-
-### Bash (Melee)
-*"Bourne Again Shell"—and again, and again...*
-
-Focuses on close combat. Requires the most player input—quick reflexes, timing, and positioning. High risk, high reward.
-
-**Playstyle:** Aggressive, in-your-face combat with combos and parries.
+- **Zombie Processes** — Common, slow, swarm in numbers
+- **Daemons** — Background processes; can be allies, enemies, or neutral
+- **Orphan Processes** — Friendly NPCs, quest givers, kindred spirits
+- **Popular Programs** — NPCs based on real Linux programs (Vim, Nano, Grep, etc.)
 
 ---
 
-### Ping (Ranged)
+## NPCs & Progression Points
 
-Focuses on long-range combat and stealth. Moderate input during combat, emphasizing accuracy, precision, and positioning.
-
-**Playstyle:** Careful, strategic—find cover, line up shots, exploit weaknesses.
-
----
-
-### Init (AoE/Summoner)
-
-Focuses on spawning subprocesses to fight for you and dealing area-of-effect damage. Lowest direct input during combat—almost plays like Brotato where auto-attacks happen while you dodge.
-
-**Playstyle:** Crowd control, positioning, managing your spawned processes.
-
----
-
-## Commands (Abilities)
-
-Commands are now split into **Combat**, **Terrain**, and **Utility** categories.
-
-### Combat Commands
-| Command | Base Effect | Bash (Melee) | Ping (Ranged) | Init (AoE) |
-|---------|-------------|--------------|---------------|------------|
-| `kill` | Basic attack | Direct melee strike | Targeted ranged shot | Damages area |
-| `pkill` | Multi-target attack | Cleave attack | Piercing shot | AoE burst |
-| `mv` | Repels enemy | `-f` knockback + damage | `-t` further range | `-v` repels all nearby |
-| `cd` | Teleport/dash | `-L` chain dash | `-P` phase through | `-e` invuln frames |
-| `sudo` | Power modifier | Makes next attack slower but much stronger | | |
-
-### Terrain Commands
-| Command | Effect | Notes |
-|---------|--------|-------|
-| `rm` | **Destroy terrain** | Removes blocks, drops Bits. Cannot destroy directory boundaries. |
-| `rm -rf` | **Area destruction** | Destroys multiple blocks at once (costs more stamina) |
-| `mkdir` | **Create structure** | Costs Bits. Creates a cluster of blocks (walls, barricades) |
-| `touch` | **Create single block** | Costs Bits. Places one block |
-| `cp` | **Duplicate block** | Copy an existing block to another location |
-
-### Utility Commands
-| Command | Effect | Notes |
-|---------|--------|-------|
-| `ls` | **Reveal area** | Shows hidden enemies, items, or secret paths |
-| `grep` | **Mark/target** | Highlights enemies, makes them take more damage |
-| `cat` | **Combine** | Merge items or chain abilities |
-| `chmod` | **Modify properties** | Change block/enemy resistances |
-| `curl`/`wget` | **Pull** | Drag enemies or items toward you |
-
----
-
-## NPCs & Enemies
-Enemies drop **Bytes** (currency) and **PID** (XP) when defeated.
-
-### Zombie Processes
-The most common enemy. Slow, easy to kill individually, but numerous. Swarm tactics—overwhelm through sheer numbers.
-
-### Daemons
-Background processes that can be allies, enemies, or neutral. Some start friendly and become corrupted; others start hostile but can be redeemed.
-
-### Orphan Processes
-Friendly NPCs the player can interact with. Often need help, rescue, or have quests. They're kindred spirits to the player.
-
-### Popular Programs
-NPCs and enemies based on real Linux programs:
-- **Vim** — Wise but cryptic sage (hard to escape from)
-- **Nano** — Friendly, approachable helper
-- **Systemd** — Controversial figure, either loved or hated
-- **Firefox** — Memory-hungry but well-meaning ally
-- **Grep** — Detective/scout type
-
----
-
-## World (Directory Structure)
-
-The world is structured like a Linux filesystem. Each directory is a **room/area** with:
-- **Indestructible boundary walls** (the folder itself)
-- **Destructible interior content** (terrain blocks, obstacles)
-- **Corridors** connecting to parent/child directories
-
-### Starting Areas
-
-#### `~/` (Home Directory)
-**The Hub / Starting Zone**
-
-The player's home base. Safe area with basic tutorials, the Kernel's guidance, and access to the first quests. Contains the player's config files (save points?) and personal directories.
-
-- Interior is mostly empty, player can build here
-- `.bashrc`, `.config/` could be interactable objects
-
-#### `/tmp/` (Temporary Files)
-**First Dungeon — The Ephemeral Wastes**
-
-A chaotic, ever-changing area. Terrain blocks randomly appear and disappear. Enemies here are weak but unpredictable. Good tutorial zone for combat and terrain mechanics.
-
-- Blocks here are unstable—some expire and vanish
-- Environment hazards: areas that "expire" and damage you if you linger
-- Good source of Bits but volatile
-
-**Boss:** A rogue temporary process that refuses to be cleaned up.
-
-#### `/var/log/` (Log Files)
-**The Archives**
-
-A quieter, exploration-focused area. Dense with destructible blocks containing lore. The player pieces together what happened from log entries hidden in terrain.
-
-- "Echo" enemies that replay past events
-- Blocks here often contain story fragments
-
----
-
-### Later Areas (To Be Designed)
-
-#### `/etc/` (Configuration)
-**The Market / Configuration Center**
-
-A store or market-style location. NPCs sell upgrades, abilities, and items for Bytes. Config files that can be "edited" to change game parameters.
-
-#### `/dev/` (Devices)
-**The Device Dungeon**
-
-Hardware-based enemies and puzzles. Special enemies: `/dev/null` (consumes attacks), `/dev/random` (chaotic behavior), `/dev/zero` (infinite weak spawns).
-
-#### `/opt/` (Optional Software)
-**The Optional Frontier**
-
-Side content, bonus areas, optional bosses.
-
-#### `/root/` (Root Home)
-**Endgame — The Sanctum**
-
-Requires root privileges to enter. Final area before confronting Cron. Heavily guarded.
-
-#### `/etc/cron.d/` or `/var/spool/cron/`
-**Final Boss Arena**
-
-Cron's domain. The scheduled job queue made manifest.
-
----
-
-## Progression Systems
-
-### Package Managers (Move Tutors)
-NPCs that teach new abilities:
-- **Pacman** — The Arch way, bleeding edge moves
-- **Apt** — Stable, reliable, well-documented moves
+### Package Managers (Ability Vendors)
+NPCs that sell or teach/upgrade/train new commands for Bytes:
+- **Pacman** — Bleeding-edge abilities
+- **Apt** — Stable, well-documented abilities
 - **Yum/DNF** — Enterprise-grade abilities
-- **Flatpak/Snap** — Containerized abilities (self-contained, no dependencies)
 
-### Scripts (Consumables)
-One-time-use items that execute powerful effects. Can be found, crafted, or purchased with Bytes.
-
-### Shells (Classes or Cosmetics)
-Different shells could be:
-- **Cosmetic skins** — Bash, Zsh, Fish, etc. look different
-- **Minor stat modifiers** — Each shell has small bonuses
-- **Decide during implementation**
-
----
-
-## Future Considerations (Not for MVP)
-- Networking areas (accessing remote systems, multiplayer?)
-- Hacking/security mechanics
-- Viruses, worms, malware as enemy types or events
-- Security software as allies or environmental effects
-- Other operating systems as alternate dimensions/DLC
-- File type extensions affecting enemy behaviors
-- Kernel panics as fail states or special events
+### Upgrade Shrines
+Locations where ROM Chips and RAM Modules can be redeemed for permanent stat increases (like Zelda's Goddess Statues).
 
 ---
 
 ## MVP Scope (First Playable)
-1. **Home directory hub** with basic movement and one NPC (Kernel)
+
+1. **Home directory hub** with basic movement and Kernel NPC
    - [x] Basic movement/controls
-   - [x] Player rendering (V5 Design)
-   - [ ] Hub area
+   - [x] Player rendering
+   - [ ] Hub area with Kernel dialogue
 2. **Block-based terrain** with `1`/`0` visuals
 3. **One combat zone** (`/tmp/`) with Zombie Process enemies
    - [x] Basic enemy AI and collision
-   - [x] Class selection (Bash, Ping, Init) implemented
    - [x] Mobile touch controls
-4. **Resource drops** — Bits from terrain, Bytes from enemies
-5. **Core commands:**
-   - `kill` — Attack enemies
-   - `rm` — Destroy terrain (drops Bits)
-   - `touch` — Create single block (costs Bits)
-6. **Simple health/stamina** (ROM/RAM)
-   - [x] Profile UI implemented (Bars removed)
-   - [ ] Logic/Regen tuning
-7. **Basic enemy AI** and collision
-8. **One mini-boss**
+4. **Two starting commands**: one melee attack, one terrain destroy
+5. **Usage-based mastery** tracking for starting commands
+6. **Resource drops** — Bits from terrain, Bytes from enemies
+7. **ROM/RAM** as health/stamina
+8. **One discoverable command** pickup in `/tmp/`
+9. **One mini-boss**
 
-Then iterate from there.
+---
+
+## Future Scope (Post-MVP)
+- Flag unlocks at mastery milestones
+- Pipe combo system
+- Building commands (touch, mkdir)
+- Multiple areas with corridor navigation
+- NPC vendors (Package Managers)
+- ROM Chip / RAM Module upgrade shrines
+- Equipment system (binaries as weapons)
+- Death currency drop and recovery

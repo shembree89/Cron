@@ -14,14 +14,9 @@ const closeProfileBtn = document.getElementById('close-profile');
 const uiElements = {
     health: document.getElementById('profile-health'),
     stamina: document.getElementById('profile-stamina'),
-    compute: document.getElementById('profile-compute'),
-    clock: document.getElementById('profile-clock'),
-    memory: document.getElementById('profile-memory'),
-    bandwidth: document.getElementById('profile-bandwidth'),
-    xp: document.getElementById('profile-xp'),
     bits: document.getElementById('profile-bits'),
     bytes: document.getElementById('profile-bytes'),
-    skills: document.getElementById('profile-skills-placeholder')
+    commands: document.getElementById('profile-commands')
 };
 
 // Colors - Circuit board palette
@@ -65,111 +60,110 @@ const camera = {
     smoothing: 0.1  // How smoothly camera follows (0 = instant, 1 = never)
 };
 
-// XP milestones for leveling up
-// XP milestones for leveling up (extended to 20 levels, slower progression)
-const XP_MILESTONES = [
-    0,      // Level 1 (start)
-    30,     // Level 2
-    75,     // Level 3
-    140,    // Level 4
-    230,    // Level 5
-    350,    // Level 6
-    500,    // Level 7
-    700,    // Level 8
-    950,    // Level 9
-    1250,   // Level 10
-    1600,   // Level 11
-    2000,   // Level 12
-    2500,   // Level 13
-    3100,   // Level 14
-    3800,   // Level 15
-    4600,   // Level 16
-    5500,   // Level 17
-    6500,   // Level 18
-    7600,   // Level 19
-    9000    // Level 20
-];
-
-// Skill Tree - Three paths with Linux command-style options
-const SKILL_TREE = {
-    bash: {
-        name: 'Bash',
+// Command definitions — the abilities the player can discover and master
+// Each command belongs to a binary (weapon type) and has its own mastery (0-100)
+// Mastery tiers: 0-24 Novice, 25-49 Familiar, 50-74 Proficient (flag 1), 75-99 Expert (flag 2), 100 Mastered (piping)
+const COMMANDS = {
+    kill: {
+        name: 'kill',
+        binary: 'bash',       // melee binary
+        type: 'melee',
+        description: 'Send a signal to terminate a process',
+        baseDamage: 15,
+        staminaCost: 15,
+        cooldown: 0.35,
+        range: 60,
+        arc: Math.PI / 2,     // 90 degree slash
         color: '#ff6600',
-        description: 'Melee - /bin/bash',
-        abilities: [
-            // Tier 1 (Common)
-            { id: 'bashrc', name: '.bashrc', desc: 'Config: +2 Compute (Damage)', tier: 1, effect: { stats: { compute: 2 } } },
-            // Path: Force (Juggernaut)
-            { id: 'mount', name: 'mount', desc: '[Force] Mounting: +5 Memory (Health)', tier: 2, requires: 'bashrc', effect: { stats: { memory: 5 } } },
-            { id: 'sudo', name: 'sudo', desc: '[Force] Superuser: Reflect 20% damage', tier: 3, requires: 'mount', effect: { reflect: 0.2 } },
-            // Path: Brute (Berserker)
-            { id: 'nice', name: 'nice -n -20', desc: '[Brute] High Priority: +5 Compute, -2 Memory', tier: 2, requires: 'bashrc', effect: { stats: { compute: 5, memory: -2 } } },
-            { id: 'panic', name: 'kernel_panic', desc: '[Brute] Panic: Dmg increases as Health drops', tier: 3, requires: 'nice', effect: { lowHpDamage: true } }
-        ]
+        flags: {
+            // Unlocked at mastery 50 — area sweep
+            '-9': { mastery: 50, desc: 'SIGKILL: Execute enemies below 20% health', effect: 'execute' },
+            // Unlocked at mastery 75 — force kill
+            '-f': { mastery: 75, desc: 'Force: +50% damage', effect: 'damageMult' }
+        }
     },
     ping: {
-        name: 'Ping',
+        name: 'ping',
+        binary: 'ping',       // ranged binary
+        type: 'ranged',
+        description: 'Send ICMP echo request packets',
+        baseDamage: 10,
+        staminaCost: 10,
+        cooldown: 0.3,
+        range: 500,
+        projectileSpeed: 700,
         color: '#00ff00',
-        description: 'Ranged - /usr/bin/ping',
-        abilities: [
-            // Tier 1 (Common)
-            { id: 'ping-c', name: 'ping -c', desc: 'Count: +2 Clock (Speed)', tier: 1, effect: { stats: { clock: 2 } } },
-            // Path: Echo (Sniper)
-            { id: 'traceroute', name: 'traceroute', desc: '[Echo] Trace: +5 Bandwidth (Range/Util)', tier: 2, requires: 'ping-c', effect: { stats: { bandwidth: 5 } } },
-            { id: 'packet-loss', name: 'packet_loss', desc: '[Echo] Loss: Projectiles phase through walls', tier: 3, requires: 'traceroute', effect: { phaseWalls: true } },
-            // Path: Flood (Skirmisher)
-            { id: 'ddos', name: 'ddos', desc: '[Flood] Denial: +5 Clock, -2 Compute', tier: 2, requires: 'ping-c', effect: { stats: { clock: 5, compute: -2 } } },
-            { id: 'async', name: 'async_io', desc: '[Flood] Async: No move penalty while attacking', tier: 3, requires: 'ddos', effect: { moveWhileAttacking: true } }
-        ]
+        flags: {
+            '-c': { mastery: 50, desc: 'Count: Pierce through 1 enemy', effect: 'pierce' },
+            '-f': { mastery: 75, desc: 'Flood: Triple shot cone', effect: 'cone' }
+        }
     },
-    init: {
-        name: 'Init',
-        color: '#ff00ff',
-        description: 'Summoner - /sbin/init',
-        abilities: [
-            // Tier 1 (Common)
-            { id: 'fork', name: 'fork', desc: 'Process: +2 Bandwidth (Efficiency)', tier: 1, effect: { stats: { bandwidth: 2 } } },
-            // Path: Daemon (Summoner)
-            { id: 'daemon', name: 'daemon', desc: '[Daemon] Background: +1 Max Drone', tier: 2, requires: 'fork', effect: { maxDrones: 1 } },
-            { id: 'zombie', name: 'zombie_reaper', desc: '[Daemon] Reaper: Drones explode on death', tier: 3, requires: 'daemon', effect: { droneExplode: true } },
-            // Path: Service (Controller)
-            { id: 'systemd', name: 'systemd', desc: '[Service] Manager: +5 Memory (Survival)', tier: 2, requires: 'fork', effect: { stats: { memory: 5 } } },
-            { id: 'cron', name: 'cron_job', desc: '[Service] Automation: Periodic auto-heal', tier: 3, requires: 'systemd', effect: { autoHeal: true } }
-        ]
+    rm: {
+        name: 'rm',
+        binary: 'coreutils',  // terrain binary
+        type: 'terrain',
+        description: 'Remove files (destroy terrain)',
+        baseDamage: 20,       // vs blocks
+        staminaCost: 8,
+        cooldown: 0.25,
+        range: 60,
+        color: '#ff3333',
+        flags: {
+            '-r': { mastery: 50, desc: 'Recursive: Destroy in area', effect: 'aoe' },
+            '-f': { mastery: 75, desc: 'Force: Destroy strong blocks in one hit', effect: 'oneHit' }
+        }
     }
 };
 
-// Player - represents a microprocessor/chip
+// Get mastery tier label
+function getMasteryTier(mastery) {
+    if (mastery >= 100) return 'Mastered';
+    if (mastery >= 75) return 'Expert';
+    if (mastery >= 50) return 'Proficient';
+    if (mastery >= 25) return 'Familiar';
+    return 'Novice';
+}
+
+// Get mastery scaling multiplier (affects damage, stamina cost, cooldown)
+function getMasteryScale(mastery) {
+    // Damage: 1.0 at 0, up to 1.5 at 100
+    const damageMult = 1.0 + (mastery / 100) * 0.5;
+    // Stamina cost: 1.0 at 0, down to 0.6 at 100
+    const staminaMult = 1.0 - (mastery / 100) * 0.4;
+    // Cooldown: 1.0 at 0, down to 0.7 at 100
+    const cooldownMult = 1.0 - (mastery / 100) * 0.3;
+    return { damageMult, staminaMult, cooldownMult };
+}
+
+// Player - represents a microprocessor/chip (orphan process)
 const player = {
     x: 0,
     y: 0,
     size: 24,
-    speed: 250, // Base speed, modified by Clock
+    speed: 250,
+    // Core stats — increased by finding ROM Chips / RAM Modules in the world
     health: 100,
-    // maxHealth derived from Memory
+    maxHealth: 100,
     stamina: 100,
-    // maxStamina derived from Memory
-    xp: 0,
-    level: 1,
-    // Core Stats (Combat D&D System)
-    stats: {
-        compute: 10,    // Power: Damage, Knockback
-        clock: 10,      // Speed: Attack Speed, Move Speed, Crit
-        memory: 10,     // Stability: Health, Stamina
-        bandwidth: 10   // Efficiency: Cooldowns, AoE, Utility
-    },
-    skillPoints: 0,
-    subclass: null, // 'bash', 'ping', 'init'
-    unlockedAbilities: [], // Array of ability IDs
+    maxStamina: 100,
+    // Currency
     bits: 0,
     bytes: 0,
+    // Commands — mastery tracking per command (0-100)
+    // Player starts with 'kill' (melee) and 'rm' (terrain destroy)
+    mastery: {
+        kill: 0,
+        rm: 0
+    },
+    // Currently equipped $PATH command (used on swipe attack)
+    equippedCommand: 'kill',
+    // Combat state
     attacking: false,
     attackCooldown: 0,
     attackDuration: 0,
     attackAngle: 0,
     facingAngle: 0,
     invulnerable: 0,
-    auraTimer: 0, // Init build aura
     vx: 0,
     vy: 0,
     pulsePhase: 0,
@@ -177,22 +171,15 @@ const player = {
 };
 
 // Game State
-let gameState = 'INTRO'; // INTRO, SELECT, PLAYING
+let gameState = 'INTRO'; // INTRO, PLAYING
 let introStep = 0;
 const INTRO_TEXTS = [
     "System critical... Kernel panic imminent...",
     "Cron has corrupted the job scheduler. Processes are going rogue across the entire system.",
     "I have isolated you—an orphan process—from the purge. You are the last hope to restore order.",
-    "I can grant you access to one of three execution protocols. Choose your path wisely.",
-    "Controls: Mobile: [Left Side] Drag to move, [Right Side] Swipe to attack. Desktop: [WASD] Move, [Space/Click] Attack."
+    "I have loaded two commands into your $PATH: kill and rm. Use them wisely—the more you fight, the stronger they become.",
+    "Controls: [Left Side] Drag to move. [Right Side] Swipe to attack."
 ];
-
-// Level-up menu state
-let levelUpMenu = {
-    active: false,
-    selectedPath: null,
-    availableAbilities: []
-};
 
 // Terrain blocks
 let blocks = [];
@@ -243,13 +230,13 @@ function setupTouchControls() {
     canvas.addEventListener('touchmove', handleTouchMove, { passive: false });
     canvas.addEventListener('touchend', handleTouchEnd, { passive: false });
 
-    // UI Event Listeners for Intro/Class Selection
+    // UI Event Listeners for Intro
     const skipBtn = document.getElementById('skip-intro');
     if (skipBtn) {
         skipBtn.addEventListener('click', () => {
-            gameState = 'SELECT';
+            gameState = 'PLAYING';
             document.getElementById('intro-overlay').classList.add('hidden');
-            document.getElementById('class-selection').classList.remove('hidden');
+            showMessage('Left side: drag to move | Right side: swipe to attack', 4000);
         });
     }
 
@@ -257,18 +244,6 @@ function setupTouchControls() {
     if (nextBtn) {
         nextBtn.addEventListener('click', advanceIntro);
     }
-
-    document.querySelectorAll('.class-card').forEach(card => {
-        card.addEventListener('click', (e) => {
-            const build = card.getAttribute('data-class');
-            selectClass(build);
-        });
-        card.addEventListener('touchstart', (e) => {
-            e.preventDefault(); // Prevent ghost clicks
-            const build = card.getAttribute('data-class');
-            selectClass(build);
-        }, { passive: false });
-    });
 
     // Using Touch Events - confirmed working on Android Chrome
 
@@ -286,12 +261,6 @@ function setupTouchControls() {
                 restartGame();
             }
             return; // Don't process other input when dead
-        }
-
-        // Handle level-up menu taps
-        if (levelUpMenu.active) {
-            handleLevelUpMenuTap(x, y);
-            return; // Don't process as game input
         }
 
         if (gameState !== 'PLAYING') return;
@@ -391,9 +360,9 @@ function advanceIntro() {
         textEl.innerText = "";
         typeWriter(INTRO_TEXTS[introStep], textEl);
     } else {
-        gameState = 'SELECT';
+        gameState = 'PLAYING';
         document.getElementById('intro-overlay').classList.add('hidden');
-        document.getElementById('class-selection').classList.remove('hidden');
+        showMessage('Left side: drag to move | Right side: swipe to attack', 4000);
     }
 }
 
@@ -405,38 +374,27 @@ function typeWriter(text, element, i = 0) {
     }
 }
 
-function selectClass(build) {
-    player.subclass = build;
-    restartGame();
-    gameState = 'PLAYING'; // Ensure state is correct (restartGame sets running=true)
-    document.getElementById('class-selection').classList.add('hidden');
-    showMessage(`Protocol ${build.toUpperCase()} Loaded.`, 3000);
-}
+// Increase mastery for a command after successful use
+function gainMastery(commandId, amount) {
+    if (player.mastery[commandId] === undefined) return;
+    const prev = player.mastery[commandId];
+    player.mastery[commandId] = Math.min(100, prev + amount);
+    const newMastery = player.mastery[commandId];
 
-// Handle taps on the level-up menu
-function handleLevelUpMenuTap(x, y) {
-    if (levelUpMenu.selectedPath === null) {
-        // Check path buttons
-        for (const btn of levelUpButtons.paths) {
-            if (x >= btn.x && x <= btn.x + btn.width && y >= btn.y && y <= btn.y + btn.height) {
-                selectPath(btn.pathId);
-                return;
-            }
-        }
-    } else {
-        // Check back button
-        const back = levelUpButtons.backButton;
-        if (x >= back.x && x <= back.x + back.width && y >= back.y && y <= back.y + back.height) {
-            levelUpMenu.selectedPath = null;
-            return;
-        }
-
-        // Check ability buttons
-        for (const btn of levelUpButtons.abilities) {
-            if (x >= btn.x && x <= btn.x + btn.width && y >= btn.y && y <= btn.y + btn.height) {
-                const ability = levelUpMenu.availableAbilities[btn.index];
-                unlockAbility(ability);
-                return;
+    // Check for milestone notifications
+    const milestones = [25, 50, 75, 100];
+    for (const m of milestones) {
+        if (prev < m && newMastery >= m) {
+            const cmd = COMMANDS[commandId];
+            const tier = getMasteryTier(newMastery);
+            showMessage(`${cmd.name} → ${tier}! (v${(newMastery / 100).toFixed(2)})`, 2500);
+            // Check flag unlocks
+            if (cmd.flags) {
+                for (const [flag, info] of Object.entries(cmd.flags)) {
+                    if (info.mastery === m) {
+                        showMessage(`Unlocked: ${cmd.name} ${flag} — ${info.desc}`, 3000);
+                    }
+                }
             }
         }
     }
@@ -717,27 +675,6 @@ function addBlock(x, y) {
 }
 
 function handleKey(key, pressed) {
-    // Handle level-up menu (only if playing but paused for menu)
-    if (gameState === 'PLAYING' && levelUpMenu.active && pressed) {
-        if (levelUpMenu.selectedPath === null) {
-            // Select a path
-            if (key === '1') selectPath('bash');
-            else if (key === '2') selectPath('ping');
-            else if (key === '3') selectPath('init');
-        } else {
-            // Select an ability or go back
-            if (key === 'Escape' || key === 'Backspace') {
-                levelUpMenu.selectedPath = null;
-            } else if (key >= '1' && key <= '5') {
-                const index = parseInt(key) - 1;
-                if (index < levelUpMenu.availableAbilities.length) {
-                    unlockAbility(levelUpMenu.availableAbilities[index]);
-                }
-            }
-        }
-        return;
-    }
-
     if (gameState !== 'PLAYING') return;
 
     switch (key.toLowerCase()) {
@@ -749,197 +686,78 @@ function handleKey(key, pressed) {
     }
 }
 
-function selectPath(pathId) {
-    levelUpMenu.selectedPath = pathId;
-    updateAvailableAbilities();
+// Check if player has unlocked a flag for a command
+function hasFlag(commandId, flag) {
+    const cmd = COMMANDS[commandId];
+    if (!cmd || !cmd.flags || !cmd.flags[flag]) return false;
+    return (player.mastery[commandId] || 0) >= cmd.flags[flag].mastery;
 }
 
-function updateAvailableAbilities() {
-    if (!levelUpMenu.selectedPath) {
-        levelUpMenu.availableAbilities = [];
-        return;
-    }
+// Get computed stats for a specific command based on its mastery
+function getCommandStats(commandId) {
+    const cmd = COMMANDS[commandId];
+    if (!cmd) return null;
 
-    const path = SKILL_TREE[levelUpMenu.selectedPath];
-    levelUpMenu.availableAbilities = path.abilities.filter(ability => {
-        // Already unlocked?
-        if (player.unlockedAbilities.includes(ability.id)) return false;
-        // Check requirements
-        if (ability.requires && !player.unlockedAbilities.includes(ability.requires)) return false;
-        return true;
-    });
-}
+    const mastery = player.mastery[commandId] || 0;
+    const scale = getMasteryScale(mastery);
 
-function unlockAbility(ability) {
-    if (player.skillPoints <= 0) return;
-
-    player.skillPoints--;
-    player.unlockedAbilities.push(ability.id);
-
-    // Apply immediate stat effects
-    if (ability.effect && ability.effect.stats) {
-        for (const [stat, value] of Object.entries(ability.effect.stats)) {
-            if (player.stats[stat] !== undefined) {
-                player.stats[stat] += value;
-            }
-        }
-    }
-
-    showMessage(`Unlocked: ${ability.name}`, 2000);
-
-    // Close menu if no more skill points
-    if (player.skillPoints <= 0) {
-        levelUpMenu.active = false;
-        levelUpMenu.selectedPath = null;
-        game.paused = false;
-    } else {
-        // Stay in menu, update available abilities
-        updateAvailableAbilities();
-        // If no more abilities available in this path, go back to path selection
-        if (levelUpMenu.availableAbilities.length === 0) {
-            levelUpMenu.selectedPath = null;
-        }
-    }
-}
-
-function checkLevelUp() {
-    const nextLevel = player.level;
-    if (nextLevel < XP_MILESTONES.length && player.xp >= XP_MILESTONES[nextLevel]) {
-        player.level++;
-        player.skillPoints++;
-        showMessage(`LEVEL UP! Level ${player.level} - Press any key to choose ability`, 3000);
-        levelUpMenu.active = true;
-        levelUpMenu.selectedPath = null;
-        game.paused = true;
-    }
-}
-
-// Helper to check if player has an ability
-function hasAbility(abilityId) {
-    return player.unlockedAbilities.includes(abilityId);
-}
-
-// Get computed player stats based on abilities
-function getPlayerStats() {
-    const s = player.stats;
-
-    // Derived Stats
-    // Health: Base 50 + (Memory * 5) -> 100 at start
-    const maxHealth = 50 + (s.memory * 5);
-
-    // Stamina: Base 50 + (Memory * 5) -> 100 at start
-    const maxStamina = 50 + (s.memory * 5);
-
-    // Damage: Base 10 + (Compute * 0.5) -> 15 at start
-    let damage = 10 + (s.compute * 0.5);
-
-    // Move Speed: Base 200 + (Clock * 5) -> 250 at start
-    let moveSpeed = 200 + (s.clock * 5);
-
-    // Attack Speed (Cooldown): Base 0.4s - (Bandwidth * 0.01) -> 0.3s at start
-    let attackCooldown = Math.max(0.1, 0.4 - (s.bandwidth * 0.01));
-
-    // Projectile Speed: Base 500 + (Clock * 20) -> 700 at start
-    let projectileSpeed = 500 + (s.clock * 20);
-
-    let stats = {
-        damage: damage,
-        attackSpeed: attackCooldown,
-        projectileSpeed: projectileSpeed,
-        moveSpeed: moveSpeed,
-        maxHealth: maxHealth,
-        maxStamina: maxStamina,
-        pierce: 0,
-        executeThreshold: 0,
-        coneAttack: false,
-        bounceShots: false
+    return {
+        damage: cmd.baseDamage * scale.damageMult,
+        staminaCost: cmd.staminaCost * scale.staminaMult,
+        cooldown: cmd.cooldown * scale.cooldownMult,
+        range: cmd.range,
+        arc: cmd.arc || 0,
+        projectileSpeed: cmd.projectileSpeed || 0,
+        color: cmd.color,
+        type: cmd.type,
+        // Flag effects
+        executeThreshold: hasFlag(commandId, '-9') ? 0.2 : 0,
+        damageMult: hasFlag(commandId, '-f') && cmd.type === 'melee' ? 1.5 : 1.0,
+        pierce: hasFlag(commandId, '-c') ? 1 : 0,
+        cone: hasFlag(commandId, '-f') && cmd.type === 'ranged'
     };
-
-    // Bash abilities
-    if (hasAbility('kill-f')) stats.damage *= 1.5;
-    if (hasAbility('chmod-x')) stats.attackSpeed *= 0.75;
-    if (hasAbility('kill-9')) stats.executeThreshold = 0.2;
-    if (hasAbility('sudo-bash')) stats.damage *= 2; // Note: should cost 2x stamina
-    if (hasAbility('rm-rf')) stats.coneAttack = true;
-
-    // Ping abilities
-    if (hasAbility('ping-c')) stats.pierce += 1;
-    if (hasAbility('ping-i')) stats.projectileSpeed *= 1.5;
-    if (hasAbility('curl-s') && !player.attacking) stats.moveSpeed *= 1.3;
-    if (hasAbility('ssh-p')) stats.bounceShots = true;
-
-    // Init abilities (drones handled separately)
-
-    return stats;
 }
 
 function attack(targetX, targetY) {
-    // If no subclass selected yet (shouldn't happen in playing state), default to Ping
-    const build = player.subclass || 'ping';
-    const stats = getPlayerStats();
+    const cmdId = player.equippedCommand;
+    const stats = getCommandStats(cmdId);
+    if (!stats) return;
 
-    // Different costs/logic per build
-    let staminaCost = 10;
-    if (build === 'bash') staminaCost = 15;
-    if (build === 'init') staminaCost = 25;
-
-    // Sudo mode doubles cost
-    if (hasAbility('sudo-bash')) staminaCost *= 2;
-
+    const staminaCost = Math.ceil(stats.staminaCost);
     if (player.attackCooldown > 0 || player.stamina < staminaCost) return;
 
     player.stamina -= staminaCost;
-    player.attackCooldown = stats.attackSpeed;
+    player.attackCooldown = stats.cooldown;
     player.attacking = true;
     player.attackDuration = 0.15;
 
     // Calculate angle
     player.attackAngle = Math.atan2(targetY - player.y, targetX - player.x);
 
-    // --- BASH (MELEE) ---
-    if (build === 'bash') {
-        // Melee slash - short range, wide arc
-        const slashRange = 60;
+    const finalDamage = stats.damage * stats.damageMult;
+
+    // --- MELEE ---
+    if (stats.type === 'melee') {
         attacks.push({
             x: player.x,
             y: player.y,
-            vx: Math.cos(player.attackAngle) * 50, // Slight forward movement of slash
+            vx: Math.cos(player.attackAngle) * 50,
             vy: Math.sin(player.attackAngle) * 50,
-            life: 0.2, // Short life
-            size: slashRange,
-            type: 'slash', // New type to handle in update
-            damage: stats.damage * 1.5, // Higher base damage
+            life: 0.2,
+            size: stats.range,
+            type: 'slash',
+            damage: finalDamage,
             angle: player.attackAngle,
-            arc: Math.PI / 2, // 90 degree arc
-            pierce: 999 // Infinite pierce for melee
+            arc: stats.arc,
+            pierce: 999,
+            executeThreshold: stats.executeThreshold,
+            commandId: cmdId
         });
-
-        // Visual effect
-        createSlashEffect(player.x, player.y, player.attackAngle, slashRange);
+        createSlashEffect(player.x, player.y, player.attackAngle, stats.range);
     }
 
-    // --- INIT (AoE) ---
-    else if (build === 'init') {
-        // AoE Burst around player
-        const radius = 100;
-        attacks.push({
-            x: player.x,
-            y: player.y,
-            vx: 0, vy: 0,
-            life: 0.3,
-            size: radius,
-            type: 'burst',
-            damage: stats.damage * 0.8,
-            pierce: 999
-        });
-
-        // Visual effect
-        createBurstEffect(player.x, player.y, radius);
-    }
-
-    // --- PING (RANGED) ---
-    else {
-        // Standard Projectile logic (existing)
+    // --- RANGED ---
+    else if (stats.type === 'ranged') {
         const createProjectile = (angle) => {
             attacks.push({
                 x: player.x,
@@ -949,15 +767,14 @@ function attack(targetX, targetY) {
                 life: 0.8,
                 size: 6,
                 type: 'packet',
-                damage: stats.damage,
+                damage: finalDamage,
                 pierce: stats.pierce,
-                bounces: stats.bounceShots ? 2 : 0,
-                executeThreshold: stats.executeThreshold
+                executeThreshold: stats.executeThreshold,
+                commandId: cmdId
             });
         };
 
-        if (stats.coneAttack) {
-            // rm -rf cone style if unlocked
+        if (stats.cone) {
             for (let i = -1; i <= 1; i++) {
                 createProjectile(player.attackAngle + i * 0.25);
             }
@@ -966,7 +783,30 @@ function attack(targetX, targetY) {
         }
     }
 
-    // Spark particles for all casts
+    // --- TERRAIN (rm) — same as melee but targets blocks ---
+    else if (stats.type === 'terrain') {
+        attacks.push({
+            x: player.x,
+            y: player.y,
+            vx: Math.cos(player.attackAngle) * 50,
+            vy: Math.sin(player.attackAngle) * 50,
+            life: 0.2,
+            size: stats.range,
+            type: 'slash',
+            damage: finalDamage,
+            angle: player.attackAngle,
+            arc: Math.PI / 2,
+            pierce: 999,
+            commandId: cmdId
+        });
+        createSlashEffect(player.x, player.y, player.attackAngle, stats.range);
+    }
+
+    // Gain mastery from use (+0.5 per attack, combat commands gain more on hit)
+    gainMastery(cmdId, 0.3);
+
+    // Spark particles
+    const sparkColor = stats.color || COLORS.cyan;
     for (let i = 0; i < 6; i++) {
         const spread = (Math.random() - 0.5) * 0.4;
         particles.push({
@@ -976,7 +816,7 @@ function attack(targetX, targetY) {
             vy: Math.sin(player.attackAngle + spread) * (150 + Math.random() * 100),
             life: 0.25,
             maxLife: 0.25,
-            color: COLORS.cyan,
+            color: sparkColor,
             size: 2,
             type: 'spark'
         });
@@ -1085,11 +925,6 @@ function gameLoop(timestamp) {
         }
         render();
 
-        // Draw level-up menu on top if active
-        if (levelUpMenu.active) {
-            renderLevelUpMenu();
-        }
-
         // Draw death screen on top if dead
         if (game.dead) {
             renderDeathScreen();
@@ -1109,8 +944,6 @@ function update() {
     if (gameState !== 'PLAYING') return;
 
     const dt = game.deltaTime;
-    // console.log('dt:', dt); // DEBUG
-    const stats = getPlayerStats();
 
     // Spawn enemies
     spawnTimer += dt;
@@ -1140,14 +973,8 @@ function update() {
         player.facingAngle = Math.atan2(player.vy, player.vx);
     }
 
-    // Calculate move speed (curl -s gives speed boost when not attacking)
-    let moveSpeed = player.speed;
-    if (hasAbility('curl-s') && !player.attacking) {
-        moveSpeed *= 1.3;
-    }
-
-    player.x += player.vx * moveSpeed * dt;
-    player.y += player.vy * moveSpeed * dt;
+    player.x += player.vx * player.speed * dt;
+    player.y += player.vy * player.speed * dt;
 
     // Player collision with blocks
     for (const b of blocks) {
@@ -1195,54 +1022,6 @@ function update() {
     if (player.attackDuration > 0) player.attackDuration -= dt;
     else player.attacking = false;
     if (player.invulnerable > 0) player.invulnerable -= dt;
-
-    // Init Passive Aura Logic
-    if (player.subclass === 'init') {
-        player.auraTimer -= dt;
-        if (player.auraTimer <= 0) {
-            player.auraTimer = 0.5; // Tick every 0.5s
-            // Aura damage logic
-            const auraRadius = 150;
-            const auraDamage = 5 + (player.level * 2); // Scales with level
-
-            let hitAny = false;
-            for (let i = enemies.length - 1; i >= 0; i--) {
-                const e = enemies[i];
-                const dx = player.x - e.x;
-                const dy = player.y - e.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
-
-                if (dist < auraRadius + e.size) {
-                    hitAny = true;
-                    e.health -= auraDamage;
-                    e.hitTime = 0.1;
-
-                    // Particles
-                    for (let k = 0; k < 3; k++) {
-                        const angle = Math.atan2(e.y - player.y, e.x - player.x);
-                        particles.push({
-                            x: e.x,
-                            y: e.y,
-                            vx: Math.cos(angle) * 50,
-                            vy: Math.sin(angle) * 50,
-                            life: 0.2,
-                            maxLife: 0.2,
-                            color: COLORS.magenta,
-                            size: 2,
-                            type: 'spark'
-                        });
-                    }
-
-                    if (e.health <= 0) {
-                        // Simple death handling (reuse existing logic ideally, but inline for now to avoid complexity)
-                        player.xp += e.pid || 10;
-                        enemies.splice(i, 1);
-                        spawnPickup(e.x, e.y, 'byte', e.bytes || 1);
-                    }
-                }
-            }
-        }
-    }
 
     // Update attacks
     for (let i = attacks.length - 1; i >= 0; i--) {
@@ -1353,11 +1132,14 @@ function update() {
                     });
                 }
 
+                // Gain extra mastery on hit
+                if (a.commandId) {
+                    gainMastery(a.commandId, 0.5);
+                }
+
                 if (e.health <= 0) {
-                    player.xp += e.pid || 10;
-                    checkLevelUp();
                     const bytes = e.bytes || 2;
-                    showMessage(`+${e.pid || 10} PID  +${bytes} Bytes`, 1500);
+                    showMessage(`+${bytes} Bytes`, 1500);
 
                     // Spawn byte pickups
                     for (let k = 0; k < bytes; k++) {
@@ -1553,33 +1335,31 @@ function toggleProfile() {
 }
 
 function updateProfileView() {
-    const nextLevelXP = player.level < XP_MILESTONES.length ? XP_MILESTONES[player.level] : 'MAX';
-
-    uiElements.health.textContent = `${Math.floor(player.health)} / ${Math.floor(player.stats.memory * 5 + 50)}`; // Calc max health on fly or use derived stats
-    uiElements.stamina.textContent = `${Math.floor(player.stamina)} / ${Math.floor(player.stats.memory * 5 + 50)}`;
-
-    uiElements.compute.textContent = player.stats.compute;
-    uiElements.clock.textContent = player.stats.clock;
-    uiElements.memory.textContent = player.stats.memory;
-    uiElements.bandwidth.textContent = player.stats.bandwidth;
-
-    uiElements.xp.textContent = `${player.xp} / ${nextLevelXP} (Lvl ${player.level})`;
+    uiElements.health.textContent = `${Math.floor(player.health)} / ${player.maxHealth}`;
+    uiElements.stamina.textContent = `${Math.floor(player.stamina)} / ${player.maxStamina}`;
     uiElements.bits.textContent = player.bits;
     uiElements.bytes.textContent = player.bytes;
 
-    // Simple skills placeholder update
-    if (player.unlockedAbilities.length > 0) {
-        uiElements.skills.innerHTML = player.unlockedAbilities.map(id => {
-            // Find ability name across all paths
-            let name = id;
-            for (const pathKey in SKILL_TREE) {
-                const found = SKILL_TREE[pathKey].abilities.find(a => a.id === id);
-                if (found) name = found.name;
+    // Commands list with mastery
+    const commandsEl = uiElements.commands;
+    if (commandsEl) {
+        const entries = Object.keys(player.mastery).map(cmdId => {
+            const cmd = COMMANDS[cmdId];
+            if (!cmd) return '';
+            const m = player.mastery[cmdId];
+            const tier = getMasteryTier(m);
+            const version = `v${(m / 100).toFixed(2)}`;
+            const equipped = cmdId === player.equippedCommand ? ' ★' : '';
+            // Show unlocked flags
+            let flags = '';
+            if (cmd.flags) {
+                for (const [flag, info] of Object.entries(cmd.flags)) {
+                    if (m >= info.mastery) flags += ` ${flag}`;
+                }
             }
-            return `<div class="skill-tag">${name}</div>`;
-        }).join('');
-    } else {
-        uiElements.skills.textContent = "No skills unlocked yet. Level up to modify $PATH.";
+            return `<div class="skill-tag" style="color:${cmd.color}">${cmd.name}${equipped} ${version} (${tier})${flags}</div>`;
+        });
+        commandsEl.innerHTML = entries.join('');
     }
 }
 
@@ -1651,40 +1431,6 @@ function render() {
     // Draw enemies
     for (const e of enemies) {
         drawZombieProcess(e);
-    }
-
-    // Draw Init Passive Aura
-    if (player.subclass === 'init') {
-        const auraRadius = 150;
-        ctx.beginPath();
-        ctx.arc(player.x, player.y, auraRadius, 0, Math.PI * 2);
-        ctx.strokeStyle = `rgba(255, 0, 255, 0.3)`;
-        ctx.lineWidth = 2;
-        ctx.setLineDash([5, 5]);
-        ctx.stroke();
-        ctx.setLineDash([]);
-
-        ctx.fillStyle = `rgba(255, 0, 255, 0.05)`;
-        ctx.fill();
-
-        // Rotating ring
-        ctx.save();
-        ctx.translate(player.x, player.y);
-        ctx.rotate(Date.now() / 1000);
-        ctx.beginPath();
-        ctx.arc(0, 0, auraRadius - 10, 0, Math.PI * 2, false);
-        ctx.strokeStyle = `rgba(255, 0, 255, 0.2)`;
-        ctx.stroke();
-
-        // Orbiter
-        ctx.fillStyle = COLORS.magenta;
-        ctx.beginPath();
-        ctx.arc(auraRadius - 10, 0, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.beginPath();
-        ctx.arc(-(auraRadius - 10), 0, 4, 0, Math.PI * 2);
-        ctx.fill();
-        ctx.restore();
     }
 
     // Draw player
@@ -1932,13 +1678,9 @@ function drawDataPacket(a) {
 }
 
 function drawPlayer() {
-    const { x, y, size, invulnerable, pulsePhase, facingAngle, health, maxHealth, stamina, maxStamina, xp, level } = player;
+    const { x, y, size, invulnerable, pulsePhase, facingAngle, health, maxHealth, stamina, maxStamina } = player;
 
     // Calculate ratios
-    const prevLevelXP = level > 0 ? XP_MILESTONES[level - 1] || 0 : 0;
-    const nextLevelXP = level < XP_MILESTONES.length ? XP_MILESTONES[level] : XP_MILESTONES[XP_MILESTONES.length - 1];
-    const xpForThisLevel = nextLevelXP - prevLevelXP;
-    const xpProgress = xpForThisLevel > 0 ? Math.min(1, Math.max(0, (xp - prevLevelXP) / xpForThisLevel)) : 0;
     const healthRatio = health / maxHealth;
     const staminaRatio = stamina / maxStamina;
     const pulse = 1 + Math.sin(pulsePhase) * 0.03;
@@ -2041,34 +1783,25 @@ function drawPlayer() {
         }
     }
 
-    // Define Paths
-    // We want the bars to stop at ~85% towards the Front (Vertex 0).
+    // Define Paths for stamina bar on outer frame
+    // Stamina wraps around the full outer hex (both sides)
     const gapRatio = 0.15; // 15% gap at front
-
-    // Helper to get a point partway along a segment
     const lerp = (p1, p2, t) => ({ x: p1.x + (p2.x - p1.x) * t, y: p1.y + (p2.y - p1.y) * t });
 
-    // XP Path (Left): Back(3) -> TopLeft(4) -> TopRight(5) -> towards Front(0)
-    // Last segment is 5->0. We stop at 1-gapRatio.
-    const xpEndPoint = lerp(hexVerts[5], hexVerts[0], 1.0 - gapRatio);
-    const xpPath = [hexVerts[3], hexVerts[4], hexVerts[5], xpEndPoint];
+    // Left half: Back(3) -> TopLeft(4) -> TopRight(5) -> towards Front(0)
+    const leftEnd = lerp(hexVerts[5], hexVerts[0], 1.0 - gapRatio);
+    const leftPath = [hexVerts[3], hexVerts[4], hexVerts[5], leftEnd];
 
-    // Stamina Path (Right): Back(3) -> BottomLeft(2) -> BottomRight(1) -> towards Front(0)
-    // Last segment is 1->0. We stop at 1-gapRatio.
-    const staEndPoint = lerp(hexVerts[1], hexVerts[0], 1.0 - gapRatio);
-    const staPath = [hexVerts[3], hexVerts[2], hexVerts[1], staEndPoint];
+    // Right half: Back(3) -> BottomLeft(2) -> BottomRight(1) -> towards Front(0)
+    const rightEnd = lerp(hexVerts[1], hexVerts[0], 1.0 - gapRatio);
+    const rightPath = [hexVerts[3], hexVerts[2], hexVerts[1], rightEnd];
 
-    // Shift path inwards slightly so it flows INSIDE the outer frame
-    // A simple uniform scale works for a hexagon centered at 0
     const barScale = 0.85;
     const scalePt = (p) => ({ x: p.x * barScale, y: p.y * barScale });
 
-    const xpPathScaled = xpPath.map(scalePt);
-    const staPathScaled = staPath.map(scalePt);
-
-    // Draw Bars
-    drawSolidBar(xpPathScaled, xpProgress, COLORS.darkBlue);
-    drawSolidBar(staPathScaled, staminaRatio, COLORS.lightBlue);
+    // Draw stamina (yellow) on both sides of outer frame
+    drawSolidBar(leftPath.map(scalePt), staminaRatio, COLORS.yellow);
+    drawSolidBar(rightPath.map(scalePt), staminaRatio, COLORS.yellow);
 
     // === OUTER HEXAGON FRAME ===
     ctx.beginPath();
@@ -2286,17 +2019,17 @@ function renderDeathScreen() {
     ctx.shadowBlur = 20;
 
     if (isMobile) {
-        ctx.fillText('PROCESS', centerX, centerY - 100);
-        ctx.fillText('TERMINATED', centerX, centerY - 65);
+        ctx.fillText('KERNEL', centerX, centerY - 100);
+        ctx.fillText('PANIC', centerX, centerY - 65);
     } else {
-        ctx.fillText('PROCESS TERMINATED', centerX, centerY - 80);
+        ctx.fillText('KERNEL PANIC', centerX, centerY - 80);
     }
 
     // Subtitle
     ctx.font = isMobile ? '14px monospace' : '18px monospace';
     ctx.fillStyle = COLORS.white;
     ctx.shadowBlur = 0;
-    ctx.fillText(`PID gained: ${player.xp}`, centerX, centerY - 20);
+    ctx.fillText('Process crashed.', centerX, centerY - 20);
 
     // Restart button - larger and responsive
     const btnWidth = Math.min(280, game.width - 40);
@@ -2322,7 +2055,7 @@ function renderDeathScreen() {
     // Button text
     ctx.font = 'bold 28px Orbitron, monospace';
     ctx.fillStyle = COLORS.cyan;
-    ctx.fillText('RESTART', centerX, btnY + btnHeight / 2);
+    ctx.fillText('REBOOT', centerX, btnY + btnHeight / 2);
 
     ctx.shadowBlur = 0;
 }
@@ -2341,12 +2074,9 @@ function restartGame() {
     player.maxStamina = 100;
     player.health = player.maxHealth;
     player.stamina = player.maxStamina;
-    player.xp = 0;
-    player.level = 1;
-    player.skillPoints = 0;
-    player.unlockedAbilities = [];
+    player.mastery = { kill: 0, rm: 0 };
+    player.equippedCommand = 'kill';
     player.attackCooldown = 0;
-    player.auraTimer = 0; // Reset aura
 
     // Clear entities
     enemies.length = 0;
@@ -2358,197 +2088,16 @@ function restartGame() {
     // Reset game state
     game.time = 0;
 
-    // Reset level-up menu
-    levelUpMenu.active = false;
-    levelUpMenu.selectedPath = null;
-    levelUpMenu.availableAbilities = [];
-
     // Regenerate terrain and spawn enemies
     generateBlocks();
     for (let i = 0; i < 5; i++) spawnEnemy();
 
-    showMessage('PROCESS RESTARTED', 2000);
+    showMessage('SYSTEM REBOOTED', 2000);
 
     // Restart the game loop (in case it had stopped)
     // requestAnimationFrame(gameLoop); // Removed to prevent duplicate loops
 }
 
-// Render level-up menu overlay
-// Store button bounds for touch detection
-const levelUpButtons = {
-    paths: [], // [{x, y, width, height, pathId}, ...]
-    abilities: [], // [{x, y, width, height, index}, ...]
-    backButton: { x: 0, y: 0, width: 0, height: 0 }
-};
-
-function renderLevelUpMenu() {
-    // Semi-transparent overlay
-    ctx.fillStyle = 'rgba(0, 0, 0, 0.85)';
-    ctx.fillRect(0, 0, game.width, game.height);
-
-    const centerX = game.width / 2;
-    const centerY = game.height / 2;
-    const isMobile = game.width < 500;
-
-    // Title
-    ctx.font = isMobile ? 'bold 24px Orbitron, monospace' : 'bold 32px Orbitron, monospace';
-    ctx.fillStyle = COLORS.cyan;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowColor = COLORS.cyan;
-    ctx.shadowBlur = 20;
-    ctx.fillText(`LEVEL ${player.level}`, centerX, isMobile ? 60 : centerY - 200);
-
-    ctx.font = isMobile ? '14px Orbitron, monospace' : '18px Orbitron, monospace';
-    ctx.shadowBlur = 10;
-    ctx.fillText(`Skill Points: ${player.skillPoints}`, centerX, isMobile ? 90 : centerY - 160);
-
-    // Clear button storage
-    levelUpButtons.paths = [];
-    levelUpButtons.abilities = [];
-
-    if (levelUpMenu.selectedPath === null) {
-        // Show path selection
-        ctx.font = isMobile ? '16px Orbitron, monospace' : '20px Orbitron, monospace';
-        ctx.fillText('Choose a path:', centerX, isMobile ? 120 : centerY - 100);
-
-        const paths = ['bash', 'ping', 'init'];
-
-        if (isMobile) {
-            // Vertical layout for mobile
-            const boxHeight = 70;
-            const boxWidth = Math.min(280, game.width - 40);
-            const startY = 150;
-
-            paths.forEach((pathId, i) => {
-                const path = SKILL_TREE[pathId];
-                const x = centerX - boxWidth / 2;
-                const y = startY + i * (boxHeight + 15);
-
-                // Store for touch detection
-                levelUpButtons.paths.push({ x, y, width: boxWidth, height: boxHeight, pathId });
-
-                // Path box
-                ctx.strokeStyle = path.color;
-                ctx.lineWidth = 2;
-                ctx.shadowColor = path.color;
-                ctx.shadowBlur = 15;
-                ctx.strokeRect(x, y, boxWidth, boxHeight);
-                ctx.fillStyle = `${path.color}22`;
-                ctx.fillRect(x, y, boxWidth, boxHeight);
-
-                // Path name
-                ctx.font = 'bold 20px Orbitron, monospace';
-                ctx.fillStyle = path.color;
-                ctx.fillText(path.name, centerX, y + 25);
-
-                // Description
-                ctx.font = '12px monospace';
-                ctx.fillStyle = COLORS.white;
-                ctx.fillText(path.description.split(' - ')[0], centerX, y + 50);
-            });
-        } else {
-            // Horizontal layout for desktop
-            const pathWidth = 200;
-            const startX = centerX - pathWidth * 1.5;
-
-            paths.forEach((pathId, i) => {
-                const path = SKILL_TREE[pathId];
-                const x = startX + i * pathWidth + pathWidth / 2;
-                const y = centerY;
-
-                // Store for touch detection
-                levelUpButtons.paths.push({ x: x - 80, y: y - 60, width: 160, height: 120, pathId });
-
-                // Path box
-                ctx.strokeStyle = path.color;
-                ctx.lineWidth = 2;
-                ctx.shadowColor = path.color;
-                ctx.shadowBlur = 15;
-                ctx.strokeRect(x - 80, y - 60, 160, 120);
-                ctx.fillStyle = `${path.color}22`;
-                ctx.fillRect(x - 80, y - 60, 160, 120);
-
-                // Path name
-                ctx.font = 'bold 24px Orbitron, monospace';
-                ctx.fillStyle = path.color;
-                ctx.fillText(path.name, x, y - 25);
-
-                // Key hint
-                ctx.font = '16px monospace';
-                ctx.fillStyle = COLORS.white;
-                ctx.fillText(`[${i + 1}]`, x, y + 10);
-
-                // Description
-                ctx.font = '12px monospace';
-                ctx.fillText(path.description.split(' - ')[0], x, y + 35);
-            });
-        }
-    } else {
-        // Show abilities for selected path
-        const path = SKILL_TREE[levelUpMenu.selectedPath];
-
-        ctx.font = isMobile ? 'bold 20px Orbitron, monospace' : 'bold 24px Orbitron, monospace';
-        ctx.fillStyle = path.color;
-        ctx.fillText(`${path.name} Abilities`, centerX, isMobile ? 120 : centerY - 100);
-
-        // Back button
-        const backY = isMobile ? 150 : centerY - 70;
-        ctx.font = '14px monospace';
-        ctx.fillStyle = COLORS.white;
-        ctx.fillText('← TAP HERE TO GO BACK', centerX, backY);
-        levelUpButtons.backButton = { x: centerX - 120, y: backY - 15, width: 240, height: 30 };
-
-        if (levelUpMenu.availableAbilities.length === 0) {
-            ctx.font = '16px monospace';
-            ctx.fillStyle = COLORS.yellow;
-            ctx.fillText('No abilities available', centerX, centerY);
-            ctx.fillText('(need prerequisites)', centerX, centerY + 25);
-        } else {
-            const boxWidth = Math.min(380, game.width - 30);
-            const boxHeight = 60; // Larger touch target
-            const startY = isMobile ? 190 : centerY - 30;
-
-            levelUpMenu.availableAbilities.forEach((ability, i) => {
-                const y = startY + i * (boxHeight + 10);
-                const x = centerX - boxWidth / 2;
-
-                // Store for touch detection
-                levelUpButtons.abilities.push({ x, y, width: boxWidth, height: boxHeight, index: i });
-
-                // Ability box
-                ctx.strokeStyle = path.color;
-                ctx.lineWidth = 2;
-                ctx.shadowColor = path.color;
-                ctx.shadowBlur = 10;
-                ctx.strokeRect(x, y, boxWidth, boxHeight);
-                ctx.fillStyle = `${path.color}15`;
-                ctx.fillRect(x, y, boxWidth, boxHeight);
-
-                // Name (larger, centered)
-                ctx.font = 'bold 18px Orbitron, monospace';
-                ctx.fillStyle = path.color;
-                ctx.textAlign = 'center';
-                ctx.fillText(ability.name, centerX, y + 22);
-
-                // Description (smaller, below name)
-                ctx.font = '12px monospace';
-                ctx.fillStyle = COLORS.white;
-                ctx.fillText(ability.desc, centerX, y + 45);
-            });
-        }
-    }
-
-    // Show unlocked abilities at bottom
-    if (player.unlockedAbilities.length > 0) {
-        ctx.font = '12px monospace';
-        ctx.fillStyle = COLORS.green;
-        ctx.textAlign = 'center';
-        ctx.fillText(`Unlocked: ${player.unlockedAbilities.join(', ')}`, centerX, game.height - 30);
-    }
-
-    ctx.shadowBlur = 0;
-}
 
 // Start the game
 init();

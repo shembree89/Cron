@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Cron - The Process Wars</title>
-    <link rel="stylesheet" href="style.css?v=26">
+    <link rel="stylesheet" href="style.css?v=27">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
 </head>
@@ -47,62 +47,21 @@
             </div>
         </div>
 
-        <div id="class-selection" class="hidden">
-            <h2>SELECT YOUR BUILD</h2>
-            <div class="class-cards">
-                <div class="class-card" data-class="bash">
-                    <h3>BASH</h3>
-                    <p class="role">Melee (High Risk)</p>
-                    <p class="desc">Aggressive close combat. High damage but requires timing and reflexes.</p>
-                </div>
-                <div class="class-card" data-class="ping">
-                    <h3>PING</h3>
-                    <p class="role">Ranged (Precision)</p>
-                    <p class="desc">Long-range attacks. Focus on positioning and accuracy.</p>
-                </div>
-                <div class="class-card" data-class="init">
-                    <h3>INIT</h3>
-                    <p class="role">Summoner (AoE)</p>
-                    <p class="desc">Area control and minions. Manage the battlefield.</p>
-                </div>
-            </div>
-        </div>
-
         <div id="profile-view" class="hidden">
             <div class="profile-header">
-                <h2>PLAYER PROFILE</h2>
+                <h2>SHELL</h2>
                 <button id="close-profile">X</button>
             </div>
             <div class="profile-content">
                 <div class="stat-row">
-                    <span class="label" style="color:var(--orange)">COMPUTE (Power)</span>
-                    <span class="value" id="profile-compute">10</span>
-                </div>
-                <div class="stat-row">
-                    <span class="label" style="color:var(--green)">CLOCK (Speed)</span>
-                    <span class="value" id="profile-clock">10</span>
-                </div>
-                <div class="stat-row">
-                    <span class="label" style="color:var(--magenta)">MEMORY (Stability)</span>
-                    <span class="value" id="profile-memory">10</span>
-                </div>
-                <div class="stat-row">
-                    <span class="label" style="color:var(--cyan)">BANDWIDTH (Tech)</span>
-                    <span class="value" id="profile-bandwidth">10</span>
-                </div>
-                <div class="stat-row" style="margin-top: 10px; border-top: 1px dashed var(--cyan-dim);"></div>
-                <div class="stat-row">
-                    <span class="label">ROM (Health)</span>
+                    <span class="label" style="color:var(--magenta)">ROM (Health)</span>
                     <span class="value" id="profile-health">100/100</span>
                 </div>
                 <div class="stat-row">
-                    <span class="label">RAM (Stamina)</span>
+                    <span class="label" style="color:var(--cyan)">RAM (Stamina)</span>
                     <span class="value" id="profile-stamina">100/100</span>
                 </div>
-                <div class="stat-row">
-                    <span class="label">PID (XP)</span>
-                    <span class="value" id="profile-xp">0</span>
-                </div>
+                <div class="stat-row" style="margin-top: 10px; border-top: 1px dashed var(--cyan-dim);"></div>
                 <div class="stat-row">
                     <span class="label">Bits</span>
                     <span class="value" id="profile-bits">0</span>
@@ -112,13 +71,13 @@
                     <span class="value" id="profile-bytes">0</span>
                 </div>
                 <div class="skill-tree-section">
-                    <h3>$PATH (SKILL TREE)</h3>
-                    <div id="profile-skills-placeholder">[Skills Placeholder]</div>
+                    <h3>$PATH (Commands)</h3>
+                    <div id="profile-commands">No commands yet.</div>
                 </div>
             </div>
         </div>
     </div>
-    <script src="game.js?v=26"></script>
+    <script src="game.js?v=27"></script>
     <script>
         // Register service worker for PWA
         if ('serviceWorker' in navigator) {
