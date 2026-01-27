@@ -416,3 +416,54 @@ body {
         opacity: 0.98;
     }
 }
+
+/* Dialogue System */
+#dialogue-overlay {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 30%;
+    background: rgba(5, 10, 8, 0.95);
+    border-top: 2px solid var(--cyan);
+    z-index: 150;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    box-shadow: 0 -10px 40px rgba(0, 255, 255, 0.2);
+}
+
+#dialogue-overlay.hidden {
+    display: none;
+}
+
+#dialogue-box {
+    width: 100%;
+    max-width: 800px;
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+}
+
+#dialogue-speaker {
+    font-size: 18px;
+    font-weight: bold;
+    color: var(--cyan);
+    text-shadow: var(--glow-cyan);
+    text-transform: uppercase;
+    letter-spacing: 2px;
+}
+
+#dialogue-text {
+    font-size: 16px;
+    line-height: 1.6;
+    color: var(--green);
+    text-shadow: 0 0 5px var(--green);
+    min-height: 60px;
+}
+
+#dialogue-next {
+    align-self: flex-end;
+    margin-top: 10px;
+}

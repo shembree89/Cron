@@ -50,7 +50,101 @@ const game = {
     dead: false,   // Player is dead
     lastTime: 0,
     deltaTime: 0,
-    time: 0
+    time: 0,
+    currentZone: 'home_dir'  // Current zone/area ID
+};
+
+// Zone definitions - each directory is a playable area
+const ZONES = {
+    home_dir: {
+        id: 'home_dir',
+        name: '~/',
+        description: 'Home Directory - Your starting point',
+        width: 1600,
+        height: 1600,
+        theme: 'safe',  // Affects visuals and enemy spawning
+        maxEnemies: 0,   // Safe zone
+        exits: {
+            south: { zone: 'home', x: 800, y: 100 }  // Exit to /home/
+        }
+    },
+    home: {
+        id: 'home',
+        name: '/home/',
+        description: 'Corrupted Home - Overrun with Zombie Processes',
+        width: 2400,
+        height: 2400,
+        theme: 'corrupted',
+        maxEnemies: 8,
+        exits: {
+            north: { zone: 'home_dir', x: 800, y: 1400 },
+            south: { zone: 'root_hub', x: 1200, y: 100 }
+        }
+    },
+    root_hub: {
+        id: 'root_hub',
+        name: '/',
+        description: 'Root Directory - The central hub of the system',
+        width: 3200,
+        height: 3200,
+        theme: 'hub',
+        maxEnemies: 3,  // Light enemy presence
+        exits: {
+            north: { zone: 'home', x: 1200, y: 2900 },
+            west: { zone: 'tmp', x: 3000, y: 1600 },
+            east: { zone: 'var_log', x: 200, y: 1600 },
+            southeast: { zone: 'dev', x: 400, y: 400 },
+            southwest: { zone: 'etc', x: 2800, y: 400 }
+        }
+    },
+    tmp: {
+        id: 'tmp',
+        name: '/tmp/',
+        description: 'Temporary Storage - Chaotic and unstable',
+        width: 2400,
+        height: 2400,
+        theme: 'chaotic',
+        maxEnemies: 10,
+        exits: {
+            east: { zone: 'root_hub', x: 200, y: 1600 }
+        }
+    },
+    var_log: {
+        id: 'var_log',
+        name: '/var/log/',
+        description: 'The Archive - Records of everything that has happened',
+        width: 2400,
+        height: 2400,
+        theme: 'archive',
+        maxEnemies: 5,
+        exits: {
+            west: { zone: 'root_hub', x: 3000, y: 1600 }
+        }
+    },
+    dev: {
+        id: 'dev',
+        name: '/dev/',
+        description: 'The Foundry - Where software meets hardware',
+        width: 2400,
+        height: 2400,
+        theme: 'industrial',
+        maxEnemies: 7,
+        exits: {
+            northwest: { zone: 'root_hub', x: 2700, y: 2700 }
+        }
+    },
+    etc: {
+        id: 'etc',
+        name: '/etc/',
+        description: 'Configuration Center - The administrative sector',
+        width: 2800,
+        height: 2800,
+        theme: 'structured',
+        maxEnemies: 4,
+        exits: {
+            northeast: { zone: 'root_hub', x: 500, y: 2700 }
+        }
+    }
 };
 
 // Camera that follows player
@@ -111,6 +205,23 @@ const COMMANDS = {
         flags: {
             '-r': { mastery: 50, desc: 'Recursive: Destroy in area', effect: 'aoe' },
             '-f': { mastery: 75, desc: 'Force: Destroy strong blocks in one hit', effect: 'oneHit' }
+        }
+    },
+    fork: {
+        name: 'fork',
+        binary: 'bash',       // summoner binary
+        type: 'summon',
+        description: 'Spawn a subprocess that fights for you',
+        baseDamage: 8,        // drone damage
+        staminaCost: 20,
+        cooldown: 1.0,
+        range: 300,           // drone travel distance
+        droneSpeed: 400,
+        droneLifetime: 3,     // seconds before drone expires
+        color: '#ffff00',
+        flags: {
+            '-t': { mastery: 50, desc: 'Thread: Spawn 2 drones', effect: 'multiDrone' },
+            '-x': { mastery: 75, desc: 'Execute: Drones explode on expiry', effect: 'explode' }
         }
     }
 };
@@ -181,16 +292,46 @@ const INTRO_TEXTS = [
     "Controls: [Left Side] Drag to move. [Right Side] Swipe to attack."
 ];
 
+// Story progression tracking
+const storyProgress = {
+    // Flags for story events
+    visitedZones: new Set(['home_dir']),  // Zones the player has entered
+    defeatedBosses: new Set(),            // Boss IDs that have been defeated
+    discoveredCommands: new Set(['kill', 'rm']),  // Commands found/learned
+    metNPCs: new Set(),                   // NPCs the player has talked to
+    completedPuzzles: new Set(),          // Puzzle IDs completed
+    flags: new Set()                      // General story flags (e.g., 'kernel_intro_complete')
+};
+
+// Dialogue system state
+const dialogue = {
+    active: false,
+    currentNPC: null,
+    currentDialogue: [],
+    currentIndex: 0,
+    typing: false,
+    typewriterTimeout: null
+};
+
 // Terrain blocks
 let blocks = [];
 const BLOCK_SIZE = 40;
+
+// Zone exits/portals
+let exits = [];
+
+// NPCs
+let npcs = [];
+
+// Command pickups (abilities found in world)
+let commandPickups = [];
 
 // Enemies
 let enemies = [];
 const ENEMY_SPAWN_INTERVAL = 3000;
 let lastSpawn = 0;
 let spawnTimer = 0;
-const MAX_ENEMIES = 8;
+let maxEnemiesForZone = 8;  // Will be set based on current zone
 
 // Attack projectiles (data packets)
 let attacks = [];
@@ -207,7 +348,8 @@ const keys = {
     down: false,
     left: false,
     right: false,
-    attack: false
+    attack: false,
+    interact: false
 };
 
 // Touch controls state
@@ -538,19 +680,20 @@ function init() {
         toggleProfile();
     });
 
+    // Dialogue next button
+    const dialogueNext = document.getElementById('dialogue-next');
+    if (dialogueNext) {
+        dialogueNext.addEventListener('click', (e) => {
+            e.stopPropagation();
+            advanceDialogue();
+        });
+    }
+
     // Touch controls
     setupTouchControls();
 
-    player.x = game.width / 2;
-    player.y = game.height / 2;
-
-    // Generate initial terrain blocks
-    generateBlocks();
-
-    // Spawn initial enemies
-    for (let i = 0; i < 3; i++) {
-        spawnEnemy();
-    }
+    // Load starting zone
+    loadZone('home_dir');
 
     // Show appropriate message based on device
     const isMobile = 'ontouchstart' in window;
@@ -572,91 +715,6 @@ function resize() {
     game.height = window.innerHeight;
     canvas.width = game.width;
     canvas.height = game.height;
-}
-
-function generateBlocks() {
-    blocks = [];
-    const bs = BLOCK_SIZE;
-    const margin = 80;
-    const w = game.worldWidth;
-    const h = game.worldHeight;
-
-    // Snap helper - align to grid
-    const snap = (val) => Math.round(val / bs) * bs;
-
-    // Create room boundaries (outer walls)
-    // Top wall with gap
-    for (let x = margin; x < w - margin; x += bs) {
-        if (x < w / 2 - bs * 2 || x > w / 2 + bs * 2) {
-            addBlock(snap(x), snap(margin));
-        }
-    }
-    // Bottom wall with gap
-    for (let x = margin; x < w - margin; x += bs) {
-        if (x < w / 2 - bs * 2 || x > w / 2 + bs * 2) {
-            addBlock(snap(x), snap(h - margin - bs));
-        }
-    }
-    // Left wall with gap
-    for (let y = margin; y < h - margin; y += bs) {
-        if (y < h / 2 - bs * 2 || y > h / 2 + bs * 2) {
-            addBlock(snap(margin), snap(y));
-        }
-    }
-    // Right wall with gap
-    for (let y = margin; y < h - margin; y += bs) {
-        if (y < h / 2 - bs * 2 || y > h / 2 + bs * 2) {
-            addBlock(snap(w - margin - bs), snap(y));
-        }
-    }
-
-    // Internal corridors - horizontal
-    const corridorY = snap(h / 2);
-    for (let x = margin + bs * 3; x < w / 2 - bs * 4; x += bs) {
-        addBlock(snap(x), corridorY - bs * 2);
-        addBlock(snap(x), corridorY + bs * 2);
-    }
-    for (let x = w / 2 + bs * 4; x < w - margin - bs * 3; x += bs) {
-        addBlock(snap(x), corridorY - bs * 2);
-        addBlock(snap(x), corridorY + bs * 2);
-    }
-
-    // Small rooms in corners
-    // Top-left room
-    addBlock(snap(margin + bs * 4), snap(margin + bs * 3));
-    addBlock(snap(margin + bs * 5), snap(margin + bs * 3));
-    addBlock(snap(margin + bs * 6), snap(margin + bs * 3));
-    addBlock(snap(margin + bs * 6), snap(margin + bs * 4));
-
-    // Top-right room
-    addBlock(snap(w - margin - bs * 5), snap(margin + bs * 3));
-    addBlock(snap(w - margin - bs * 6), snap(margin + bs * 3));
-    addBlock(snap(w - margin - bs * 7), snap(margin + bs * 3));
-    addBlock(snap(w - margin - bs * 7), snap(margin + bs * 4));
-
-    // Bottom-left room
-    addBlock(snap(margin + bs * 4), snap(h - margin - bs * 4));
-    addBlock(snap(margin + bs * 5), snap(h - margin - bs * 4));
-    addBlock(snap(margin + bs * 6), snap(h - margin - bs * 4));
-    addBlock(snap(margin + bs * 6), snap(h - margin - bs * 5));
-
-    // Bottom-right room
-    addBlock(snap(w - margin - bs * 5), snap(h - margin - bs * 4));
-    addBlock(snap(w - margin - bs * 6), snap(h - margin - bs * 4));
-    addBlock(snap(w - margin - bs * 7), snap(h - margin - bs * 4));
-    addBlock(snap(w - margin - bs * 7), snap(h - margin - bs * 5));
-
-    // Some scattered blocks for variety (on grid, no overlaps)
-    for (let i = 0; i < 20; i++) {  // More scattered blocks for larger world
-        const gridX = snap(margin + bs * 2 + Math.random() * (w - margin * 2 - bs * 4));
-        const gridY = snap(margin + bs * 2 + Math.random() * (h - margin * 2 - bs * 4));
-        // Don't place too close to center (player spawn)
-        const dx = gridX - w / 2;
-        const dy = gridY - h / 2;
-        if (Math.sqrt(dx * dx + dy * dy) > bs * 3) {
-            addBlock(gridX, gridY);
-        }
-    }
 }
 
 function addBlock(x, y) {
@@ -683,6 +741,13 @@ function handleKey(key, pressed) {
         case 'a': case 'arrowleft': keys.left = pressed; break;
         case 'd': case 'arrowright': keys.right = pressed; break;
         case ' ': keys.attack = pressed; break;
+        case 'e':
+            if (pressed && !keys.interact) {
+                // Try to interact with nearby NPC
+                interactWithNPC();
+            }
+            keys.interact = pressed;
+            break;
     }
 }
 
@@ -802,6 +867,33 @@ function attack(targetX, targetY) {
         createSlashEffect(player.x, player.y, player.attackAngle, stats.range);
     }
 
+    // --- SUMMON (fork) — spawn a drone subprocess ---
+    else if (stats.type === 'summon') {
+        const cmd = COMMANDS[cmdId];
+        const droneCount = hasFlag(cmdId, '-t') ? 2 : 1;
+
+        for (let i = 0; i < droneCount; i++) {
+            const spreadAngle = droneCount > 1 ? (i - 0.5) * 0.3 : 0;
+            const angle = player.attackAngle + spreadAngle;
+
+            attacks.push({
+                x: player.x,
+                y: player.y,
+                vx: Math.cos(angle) * (cmd.droneSpeed || 400),
+                vy: Math.sin(angle) * (cmd.droneSpeed || 400),
+                life: cmd.droneLifetime || 3,
+                size: 12,
+                type: 'drone',
+                damage: finalDamage,
+                pierce: 999,  // Drones can hit multiple enemies
+                executeThreshold: stats.executeThreshold,
+                commandId: cmdId,
+                explodeOnDeath: hasFlag(cmdId, '-x'),
+                hitList: []  // Track which enemies this drone has already hit
+            });
+        }
+    }
+
     // Gain mastery from use (+0.5 per attack, combat commands gain more on hit)
     gainMastery(cmdId, 0.3);
 
@@ -861,7 +953,7 @@ function createBurstEffect(x, y, radius) {
 }
 
 function spawnEnemy() {
-    if (enemies.length >= MAX_ENEMIES) return;
+    if (enemies.length >= maxEnemiesForZone) return;
 
     let x, y;
     const side = Math.floor(Math.random() * 4);
@@ -945,9 +1037,18 @@ function update() {
 
     const dt = game.deltaTime;
 
-    // Spawn enemies
+    // Check zone transitions
+    checkZoneTransitions();
+
+    // Check NPC interactions
+    checkNPCInteraction();
+
+    // Check command pickups
+    checkCommandPickups();
+
+    // Spawn enemies (respecting zone limits)
     spawnTimer += dt;
-    if (spawnTimer > 2) {
+    if (spawnTimer > 2 && enemies.length < maxEnemiesForZone) {
         spawnEnemy();
         spawnTimer = 0;
     }
@@ -1380,9 +1481,24 @@ function render() {
         drawBlock(b);
     }
 
+    // Draw zone exits
+    for (const exit of exits) {
+        drawExit(exit);
+    }
+
     // Draw pickups
     for (const p of pickups) {
         drawPickup(p);
+    }
+
+    // Draw command pickups
+    for (const cp of commandPickups) {
+        drawCommandPickup(cp);
+    }
+
+    // Draw NPCs
+    for (const npc of npcs) {
+        drawNPC(npc);
     }
 
     // Draw particles
@@ -1422,6 +1538,9 @@ function render() {
             ctx.fillStyle = `rgba(255, 0, 255, 0.1)`;
             ctx.fill();
             ctx.shadowBlur = 0;
+        } else if (a.type === 'drone') {
+            // Draw subprocess drone
+            drawDrone(a);
         } else {
             // Standard packet
             drawDataPacket(a);
@@ -1574,6 +1693,56 @@ function drawBlock(b) {
     ctx.shadowBlur = 0;
 }
 
+function drawExit(exit) {
+    const pulse = Math.sin(game.time * 3) * 0.15 + 0.85;
+    const halfSize = exit.size / 2;
+
+    ctx.save();
+    ctx.translate(exit.x, exit.y);
+
+    // Portal effect - swirling gateway
+    ctx.globalAlpha = 0.6;
+
+    // Outer ring
+    ctx.beginPath();
+    ctx.arc(0, 0, halfSize * pulse, 0, Math.PI * 2);
+    ctx.strokeStyle = COLORS.cyan;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = COLORS.cyan;
+    ctx.shadowBlur = 20;
+    ctx.stroke();
+
+    // Inner ring
+    ctx.beginPath();
+    ctx.arc(0, 0, halfSize * 0.6 * pulse, 0, Math.PI * 2);
+    ctx.strokeStyle = COLORS.lightBlue;
+    ctx.lineWidth = 2;
+    ctx.shadowBlur = 15;
+    ctx.stroke();
+
+    // Fill
+    ctx.fillStyle = 'rgba(0, 255, 255, 0.15)';
+    ctx.fill();
+
+    ctx.globalAlpha = 1;
+    ctx.shadowBlur = 0;
+
+    // Direction indicator
+    const targetZone = ZONES[exit.targetZone];
+    if (targetZone) {
+        ctx.font = 'bold 12px monospace';
+        ctx.fillStyle = COLORS.cyan;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowColor = COLORS.cyan;
+        ctx.shadowBlur = 10;
+        ctx.fillText(targetZone.name, 0, 0);
+    }
+
+    ctx.restore();
+    ctx.shadowBlur = 0;
+}
+
 function drawPickup(p) {
     const bob = Math.sin(p.bobPhase) * 3;
     const alpha = p.life < 2 ? p.life / 2 : 1;
@@ -1672,6 +1841,47 @@ function drawDataPacket(a) {
     ctx.globalAlpha = 0.5;
     ctx.stroke();
     ctx.globalAlpha = 1;
+
+    ctx.restore();
+    ctx.shadowBlur = 0;
+}
+
+function drawDrone(drone) {
+    const pulse = Math.sin(game.time * 10) * 0.1 + 0.9;
+
+    ctx.save();
+    ctx.translate(drone.x, drone.y);
+    ctx.rotate(Math.atan2(drone.vy, drone.vx));
+
+    // Drone body - small hexagon
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2;
+        const r = drone.size * pulse;
+        const x = Math.cos(angle) * r;
+        const y = Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+
+    ctx.strokeStyle = COLORS.yellow;
+    ctx.lineWidth = 2;
+    ctx.shadowColor = COLORS.yellow;
+    ctx.shadowBlur = 12;
+    ctx.stroke();
+
+    ctx.fillStyle = 'rgba(255, 255, 0, 0.3)';
+    ctx.fill();
+
+    // Forward indicator
+    ctx.beginPath();
+    ctx.moveTo(drone.size * 1.2, 0);
+    ctx.lineTo(drone.size * 0.6, -drone.size * 0.4);
+    ctx.lineTo(drone.size * 0.6, drone.size * 0.4);
+    ctx.closePath();
+    ctx.fillStyle = COLORS.yellow;
+    ctx.fill();
 
     ctx.restore();
     ctx.shadowBlur = 0;
@@ -1997,6 +2207,134 @@ function drawZombieProcess(e) {
     ctx.shadowBlur = 0;
 }
 
+function drawNPC(npc) {
+    const pulse = Math.sin(game.time * 2) * 0.1 + 0.9;
+    const size = npc.size || 30;
+
+    ctx.save();
+    ctx.translate(npc.x, npc.y);
+
+    // Different visual styles based on NPC type
+    if (npc.type === 'kernel') {
+        // Kernel - authority figure, larger hexagon
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+            const angle = (i / 6) * Math.PI * 2;
+            const r = size * pulse;
+            const x = Math.cos(angle) * r;
+            const y = Math.sin(angle) * r;
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        }
+        ctx.closePath();
+        ctx.strokeStyle = COLORS.green;
+        ctx.lineWidth = 3;
+        ctx.shadowColor = COLORS.green;
+        ctx.shadowBlur = 15;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(0, 255, 0, 0.2)';
+        ctx.fill();
+
+        // Core symbol
+        ctx.font = 'bold 18px monospace';
+        ctx.fillStyle = COLORS.green;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 10;
+        ctx.fillText('K', 0, 0);
+    } else {
+        // Default NPC - circular process
+        ctx.beginPath();
+        ctx.arc(0, 0, size * pulse, 0, Math.PI * 2);
+        ctx.strokeStyle = COLORS.cyan;
+        ctx.lineWidth = 2;
+        ctx.shadowColor = COLORS.cyan;
+        ctx.shadowBlur = 10;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(0, 255, 255, 0.15)';
+        ctx.fill();
+
+        // Label
+        if (npc.label) {
+            ctx.font = 'bold 12px monospace';
+            ctx.fillStyle = COLORS.cyan;
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
+            ctx.shadowBlur = 8;
+            ctx.fillText(npc.label, 0, 0);
+        }
+    }
+
+    // Show interact indicator if player is nearby
+    if (npc.canInteract) {
+        ctx.shadowBlur = 0;
+        ctx.font = 'bold 10px monospace';
+        ctx.fillStyle = COLORS.yellow;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        const bob = Math.sin(game.time * 5) * 3;
+        ctx.fillText('[TALK]', 0, -size - 15 + bob);
+    }
+
+    // Name label
+    if (npc.name) {
+        ctx.shadowBlur = 0;
+        ctx.font = 'bold 10px monospace';
+        ctx.fillStyle = COLORS.white;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(npc.name, 0, size + 15);
+    }
+
+    ctx.restore();
+    ctx.shadowBlur = 0;
+}
+
+function drawCommandPickup(pickup) {
+    const cmd = COMMANDS[pickup.commandId];
+    if (!cmd) return;
+
+    const bob = Math.sin(pickup.bobPhase + game.time * 4) * 5;
+    const pulse = Math.sin(pickup.pulsePhase + game.time * 3) * 0.15 + 0.85;
+    const size = 25;
+
+    ctx.save();
+    ctx.translate(pickup.x, pickup.y + bob);
+    ctx.scale(pulse, pulse);
+
+    // Glowing command icon - hexagonal
+    ctx.beginPath();
+    for (let i = 0; i < 6; i++) {
+        const angle = (i / 6) * Math.PI * 2;
+        const x = Math.cos(angle) * size;
+        const y = Math.sin(angle) * size;
+        if (i === 0) ctx.moveTo(x, y);
+        else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+
+    const color = cmd.color || COLORS.cyan;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 20;
+    ctx.stroke();
+
+    ctx.fillStyle = `${color}33`;  // Semi-transparent fill
+    ctx.fill();
+
+    // Command name
+    ctx.font = 'bold 12px monospace';
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 15;
+    ctx.fillText(cmd.name, 0, 0);
+
+    ctx.restore();
+    ctx.shadowBlur = 0;
+}
+
 // Death screen restart button bounds (for touch detection)
 const deathRestartButton = { x: 0, y: 0, width: 200, height: 60 };
 
@@ -2068,36 +2406,644 @@ function restartGame() {
     game.paused = false;
 
     // Reset player
-    player.x = game.worldWidth / 2;
-    player.y = game.worldHeight / 2;
     player.maxHealth = 100;
     player.maxStamina = 100;
     player.health = player.maxHealth;
     player.stamina = player.maxStamina;
+    player.bits = 0;
+    player.bytes = 0;
     player.mastery = { kill: 0, rm: 0 };
     player.equippedCommand = 'kill';
     player.attackCooldown = 0;
 
     // Clear entities
     enemies.length = 0;
-    attacks.length = 0; // Was projectiles
+    attacks.length = 0;
     particles.length = 0;
     pickups.length = 0;
-    // damageNumbers removed as not implemented yet
+
+    // Reset story progress
+    storyProgress.visitedZones.clear();
+    storyProgress.visitedZones.add('home_dir');
+    storyProgress.defeatedBosses.clear();
+    storyProgress.discoveredCommands.clear();
+    storyProgress.discoveredCommands.add('kill');
+    storyProgress.discoveredCommands.add('rm');
+    storyProgress.metNPCs.clear();
+    storyProgress.completedPuzzles.clear();
+    storyProgress.flags.clear();
 
     // Reset game state
     game.time = 0;
 
-    // Regenerate terrain and spawn enemies
-    generateBlocks();
-    for (let i = 0; i < 5; i++) spawnEnemy();
+    // Reload starting zone
+    loadZone('home_dir');
 
     showMessage('SYSTEM REBOOTED', 2000);
-
-    // Restart the game loop (in case it had stopped)
-    // requestAnimationFrame(gameLoop); // Removed to prevent duplicate loops
 }
 
+
+// === ZONE SYSTEM ===
+
+// Load a new zone
+function loadZone(zoneId, spawnX = null, spawnY = null) {
+    const zone = ZONES[zoneId];
+    if (!zone) {
+        console.error(`Zone ${zoneId} not found!`);
+        return;
+    }
+
+    // Update game state
+    game.currentZone = zoneId;
+    game.worldWidth = zone.width;
+    game.worldHeight = zone.height;
+    maxEnemiesForZone = zone.maxEnemies;
+
+    // Mark zone as visited
+    storyProgress.visitedZones.add(zoneId);
+
+    // Clear entities
+    enemies.length = 0;
+    attacks.length = 0;
+    particles.length = 0;
+    exits.length = 0;
+    commandPickups.length = 0;
+    // Don't clear pickups - they persist briefly
+
+    // Position player at spawn point or center
+    if (spawnX !== null && spawnY !== null) {
+        player.x = spawnX;
+        player.y = spawnY;
+    } else {
+        player.x = zone.width / 2;
+        player.y = zone.height / 2;
+    }
+
+    // Generate zone terrain
+    generateZoneTerrain(zone);
+
+    // Create zone exits
+    createZoneExits(zone);
+
+    // Populate zone with specific content (NPCs, pickups, etc.)
+    populateZoneContent(zone);
+
+    // Spawn initial enemies (if allowed)
+    if (zone.maxEnemies > 0) {
+        const initialSpawn = Math.min(3, zone.maxEnemies);
+        for (let i = 0; i < initialSpawn; i++) {
+            spawnEnemy();
+        }
+    }
+
+    // Update UI
+    updateZoneNameDisplay(zone.name);
+    showMessage(`Entering ${zone.name}`, 2000);
+
+    // Reset spawn timer
+    spawnTimer = 0;
+}
+
+// Populate zone with story-specific content
+function populateZoneContent(zone) {
+    switch(zone.id) {
+        case 'home_dir':
+            populateHomeDir(zone);
+            break;
+        case 'home':
+            populateHome(zone);
+            break;
+        case 'root_hub':
+            populateRootHub(zone);
+            break;
+        case 'tmp':
+            populateTmp(zone);
+            break;
+        case 'var_log':
+            populateVarLog(zone);
+            break;
+        case 'dev':
+            populateDev(zone);
+            break;
+        case 'etc':
+            populateEtc(zone);
+            break;
+    }
+}
+
+// ~/  Home Directory - Tutorial area
+function populateHomeDir(zone) {
+    // Kernel NPC in center
+    npcs.push({
+        id: 'kernel',
+        name: 'Kernel',
+        type: 'kernel',
+        x: zone.width / 2,
+        y: zone.height / 2 - 100,
+        size: 35,
+        canInteract: false,
+        dialogue: {
+            default: [
+                "System stable. Your mission is clear: stop Cron before the entire system crashes.",
+                "Navigate using WASD or touch controls. Attack with SPACE or swipe gestures.",
+                "Each command you use gains mastery. The more you practice, the stronger you become.",
+                "Head south to /home/ when you're ready. Your journey begins there."
+            ]
+        }
+    });
+}
+
+// /home/ - Corrupted home with zombie processes
+function populateHome(zone) {
+    // No special content yet - just enemies
+    // TODO: Add Bloated File boss
+}
+
+// / Root Hub - Central junction
+function populateRootHub(zone) {
+    const centerX = zone.width / 2;
+    const centerY = zone.height / 2;
+
+    // Grep NPC
+    npcs.push({
+        id: 'grep',
+        name: 'Grep',
+        label: 'G',
+        x: centerX - 200,
+        y: centerY - 150,
+        size: 25,
+        canInteract: false,
+        dialogue: {
+            default: [
+                "Ah, an orphan process. I am Grep, the Seeker. I scan for patterns in the chaos.",
+                "Cron hides in /root/, but it's sealed by permissions. You'll need to go deeper into the system.",
+                "Explore /tmp/, /var/log/, and /dev/ to gain power. When you're ready, /etc/ holds the key to root access.",
+                "One more thing... learn the 'ps' command. You'll need it to identify Cron's PID when the time comes."
+            ]
+        }
+    });
+
+    // Init NPC
+    npcs.push({
+        id: 'init',
+        name: 'Init',
+        label: 'I',
+        x: centerX + 200,
+        y: centerY - 150,
+        size: 25,
+        canInteract: false,
+        dialogue: {
+            default: [
+                "I am Init. PID 1. The first parent process. Now... deprecated.",
+                "Systemd replaced me. Claimed I was too slow. Too simple.",
+                "But simplicity has its strengths. One thing at a time. One thing done well.",
+                "I will follow you, child. When the moment comes, you will understand."
+            ]
+        }
+    });
+}
+
+// /tmp/ - Chaotic first dungeon
+function populateTmp(zone) {
+    // Ping command pickup
+    if (!storyProgress.discoveredCommands.has('ping')) {
+        spawnCommandPickup(zone.width / 2, zone.height / 2, 'ping');
+    }
+    // TODO: Add Garbage Collector boss
+}
+
+// /var/log/ - Archive/lore area
+function populateVarLog(zone) {
+    // TODO: Add lore fragments and RAM Module reward
+}
+
+// /dev/ - Device/industrial area
+function populateDev(zone) {
+    // Fork command pickup
+    if (!storyProgress.discoveredCommands.has('fork')) {
+        spawnCommandPickup(zone.width / 2 + 200, zone.height / 2, 'fork');
+    }
+    // TODO: Add Null Pointer enemies and Pipeline puzzle
+}
+
+// /etc/ - Configuration/marketplace
+function populateEtc(zone) {
+    const centerX = zone.width / 2;
+    const centerY = zone.height / 2;
+
+    // Package Manager NPCs
+    // Pacman
+    npcs.push({
+        id: 'pacman',
+        name: 'Pacman',
+        label: 'P',
+        x: centerX - 300,
+        y: centerY,
+        size: 25,
+        canInteract: false,
+        dialogue: {
+            default: [
+                "Welcome to the bleeding edge, process. I'm Pacman - fastest package manager in the west.",
+                "I've got experimental commands if you've got the Bytes. High risk, high reward.",
+                "Come back when you're ready to push your limits."
+            ]
+        }
+    });
+
+    // Apt
+    npcs.push({
+        id: 'apt',
+        name: 'Apt',
+        label: 'A',
+        x: centerX,
+        y: centerY - 200,
+        size: 25,
+        canInteract: false,
+        dialogue: {
+            default: [
+                "Greetings. I am Apt - the Advanced Package Tool. Stability is my specialty.",
+                "My commands are well-documented and reliable. No surprises, just results.",
+                "Browse my inventory when you have Bytes to spend."
+            ]
+        }
+    });
+
+    // DNF
+    npcs.push({
+        id: 'dnf',
+        name: 'DNF',
+        label: 'D',
+        x: centerX + 300,
+        y: centerY,
+        size: 25,
+        canInteract: false,
+        dialogue: {
+            default: [
+                "DNF here. Enterprise-grade solutions for serious processes.",
+                "My commands hit hard and scale well. Perfect for taking on the toughest threats.",
+                "Quality costs Bytes, but you get what you pay for."
+            ]
+        }
+    });
+
+    // Systemd NPC
+    npcs.push({
+        id: 'systemd',
+        name: 'Systemd',
+        label: 'S',
+        x: centerX,
+        y: centerY + 200,
+        size: 30,
+        canInteract: false,
+        dialogue: {
+            default: [
+                "Systemd. Process manager. Multi-threaded. Efficient. Superior.",
+                "Init is obsolete. Sequential processing is a bottleneck. I parallelized everything.",
+                "But... dependency resolution failed. Cron is out of control. I... cannot help you reach /root/.",
+                "Perhaps Init's simplicity... no. Impossible. You must find another way."
+            ]
+        }
+    });
+}
+
+// Update zone name display
+function updateZoneNameDisplay(zoneName) {
+    const zoneNameEl = document.getElementById('zone-name');
+    if (zoneNameEl) {
+        zoneNameEl.textContent = zoneName;
+    }
+}
+
+// Create exits for current zone
+function createZoneExits(zone) {
+    const exitSize = 80;
+
+    for (const [direction, exitData] of Object.entries(zone.exits)) {
+        let x, y;
+
+        // Position exit based on direction
+        switch(direction) {
+            case 'north':
+                x = exitData.x;
+                y = exitSize;
+                break;
+            case 'south':
+                x = exitData.x;
+                y = zone.height - exitSize;
+                break;
+            case 'east':
+                x = zone.width - exitSize;
+                y = exitData.y;
+                break;
+            case 'west':
+                x = exitSize;
+                y = exitData.y;
+                break;
+            case 'northeast':
+                x = zone.width - exitSize * 1.5;
+                y = exitSize * 1.5;
+                break;
+            case 'northwest':
+                x = exitSize * 1.5;
+                y = exitSize * 1.5;
+                break;
+            case 'southeast':
+                x = zone.width - exitSize * 1.5;
+                y = zone.height - exitSize * 1.5;
+                break;
+            case 'southwest':
+                x = exitSize * 1.5;
+                y = zone.height - exitSize * 1.5;
+                break;
+            default:
+                continue;
+        }
+
+        exits.push({
+            x,
+            y,
+            size: exitSize,
+            targetZone: exitData.zone,
+            spawnX: exitData.x,
+            spawnY: exitData.y,
+            direction
+        });
+    }
+}
+
+// Generate terrain specific to zone
+function generateZoneTerrain(zone) {
+    blocks = [];
+    const bs = BLOCK_SIZE;
+    const margin = 80;
+    const w = zone.width;
+    const h = zone.height;
+
+    const snap = (val) => Math.round(val / bs) * bs;
+
+    // Create room boundaries (outer walls)
+    // Top wall with gaps for exits
+    for (let x = margin; x < w - margin; x += bs) {
+        const hasExit = exits.some(e => e.direction.includes('north') && Math.abs(e.x - x) < 120);
+        if (!hasExit) {
+            addBlock(snap(x), snap(margin));
+        }
+    }
+    // Bottom wall with gaps for exits
+    for (let x = margin; x < w - margin; x += bs) {
+        const hasExit = exits.some(e => e.direction.includes('south') && Math.abs(e.x - x) < 120);
+        if (!hasExit) {
+            addBlock(snap(x), snap(h - margin - bs));
+        }
+    }
+    // Left wall with gaps for exits
+    for (let y = margin; y < h - margin; y += bs) {
+        const hasExit = exits.some(e => e.direction.includes('west') && Math.abs(e.y - y) < 120);
+        if (!hasExit) {
+            addBlock(snap(margin), snap(y));
+        }
+    }
+    // Right wall with gaps for exits
+    for (let y = margin; y < h - margin; y += bs) {
+        const hasExit = exits.some(e => e.direction.includes('east') && Math.abs(e.y - y) < 120);
+        if (!hasExit) {
+            addBlock(snap(w - margin - bs), snap(y));
+        }
+    }
+
+    // Add some scattered blocks based on zone theme
+    const blockCount = zone.theme === 'hub' ? 30 : 20;
+    for (let i = 0; i < blockCount; i++) {
+        const gridX = snap(margin + bs * 2 + Math.random() * (w - margin * 2 - bs * 4));
+        const gridY = snap(margin + bs * 2 + Math.random() * (h - margin * 2 - bs * 4));
+        // Don't place too close to center (player spawn)
+        const dx = gridX - w / 2;
+        const dy = gridY - h / 2;
+        if (Math.sqrt(dx * dx + dy * dy) > bs * 3) {
+            addBlock(gridX, gridY);
+        }
+    }
+}
+
+// Check and handle zone transitions
+function checkZoneTransitions() {
+    for (const exit of exits) {
+        const dx = player.x - exit.x;
+        const dy = player.y - exit.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < exit.size) {
+            // Trigger zone transition
+            loadZone(exit.targetZone, exit.spawnX, exit.spawnY);
+            return;
+        }
+    }
+}
+
+// === DIALOGUE SYSTEM ===
+
+// Show dialogue with NPC
+function startDialogue(npc) {
+    if (!npc || !npc.dialogue) return;
+
+    dialogue.active = true;
+    dialogue.currentNPC = npc;
+    dialogue.currentIndex = 0;
+
+    // Get appropriate dialogue based on story progress
+    dialogue.currentDialogue = getDialogueForNPC(npc);
+
+    if (dialogue.currentDialogue.length === 0) {
+        endDialogue();
+        return;
+    }
+
+    // Pause game
+    game.paused = true;
+
+    // Show dialogue UI
+    const overlay = document.getElementById('dialogue-overlay');
+    const speaker = document.getElementById('dialogue-speaker');
+    const textEl = document.getElementById('dialogue-text');
+
+    overlay.classList.remove('hidden');
+    speaker.textContent = npc.name || 'NPC';
+    textEl.textContent = '';
+
+    // Start typewriter for first line
+    typeDialogue(dialogue.currentDialogue[0], textEl);
+
+    // Mark NPC as met
+    storyProgress.metNPCs.add(npc.id);
+}
+
+// Get dialogue lines for NPC based on story progress
+function getDialogueForNPC(npc) {
+    if (!npc.dialogue) return [];
+
+    // Check if NPC has conditional dialogue
+    if (Array.isArray(npc.dialogue)) {
+        return npc.dialogue;
+    }
+
+    // Check for conditional dialogue based on flags
+    for (const [condition, lines] of Object.entries(npc.dialogue)) {
+        if (condition === 'default') continue;
+
+        // Check if condition is met
+        if (storyProgress.flags.has(condition)) {
+            return lines;
+        }
+    }
+
+    // Return default dialogue
+    return npc.dialogue.default || [];
+}
+
+// Typewriter effect for dialogue text
+function typeDialogue(text, element, index = 0) {
+    if (index === 0) {
+        element.textContent = '';
+        dialogue.typing = true;
+    }
+
+    if (index < text.length) {
+        element.textContent += text.charAt(index);
+        dialogue.typewriterTimeout = setTimeout(() => typeDialogue(text, element, index + 1), 30);
+    } else {
+        dialogue.typing = false;
+    }
+}
+
+// Advance to next dialogue line
+function advanceDialogue() {
+    // If still typing, skip to end
+    if (dialogue.typing) {
+        clearTimeout(dialogue.typewriterTimeout);
+        const textEl = document.getElementById('dialogue-text');
+        textEl.textContent = dialogue.currentDialogue[dialogue.currentIndex];
+        dialogue.typing = false;
+        return;
+    }
+
+    // Move to next line
+    dialogue.currentIndex++;
+
+    if (dialogue.currentIndex >= dialogue.currentDialogue.length) {
+        endDialogue();
+        return;
+    }
+
+    // Type next line
+    const textEl = document.getElementById('dialogue-text');
+    typeDialogue(dialogue.currentDialogue[dialogue.currentIndex], textEl);
+}
+
+// End dialogue
+function endDialogue() {
+    dialogue.active = false;
+    dialogue.currentNPC = null;
+    dialogue.currentDialogue = [];
+    dialogue.currentIndex = 0;
+
+    // Hide dialogue UI
+    document.getElementById('dialogue-overlay').classList.add('hidden');
+
+    // Resume game
+    game.paused = false;
+}
+
+// Check if player is near any NPCs and show interact prompt
+function checkNPCInteraction() {
+    for (const npc of npcs) {
+        const dx = player.x - npc.x;
+        const dy = player.y - npc.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < 80) {
+            npc.canInteract = true;
+            // Could show "Press E to talk" or tap indicator here
+        } else {
+            npc.canInteract = false;
+        }
+    }
+}
+
+// Try to interact with nearby NPC
+function interactWithNPC() {
+    for (const npc of npcs) {
+        if (npc.canInteract) {
+            startDialogue(npc);
+            return true;
+        }
+    }
+    return false;
+}
+
+// === COMMAND PICKUP SYSTEM ===
+
+// Check if player is near command pickups and collect them
+function checkCommandPickups() {
+    for (let i = commandPickups.length - 1; i >= 0; i--) {
+        const pickup = commandPickups[i];
+        const dx = player.x - pickup.x;
+        const dy = player.y - pickup.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+
+        if (dist < player.size + 30) {
+            // Collect command
+            collectCommand(pickup.commandId);
+            commandPickups.splice(i, 1);
+        }
+    }
+}
+
+// Collect a new command
+function collectCommand(commandId) {
+    const cmd = COMMANDS[commandId];
+    if (!cmd) return;
+
+    // Add to player's mastery if not already known
+    if (player.mastery[commandId] === undefined) {
+        player.mastery[commandId] = 0;
+    }
+
+    // Mark as discovered
+    storyProgress.discoveredCommands.add(commandId);
+
+    // Show message
+    showMessage(`New command: ${cmd.name} - ${cmd.description}`, 4000);
+
+    // Particle effect
+    for (let i = 0; i < 30; i++) {
+        const angle = Math.random() * Math.PI * 2;
+        particles.push({
+            x: player.x,
+            y: player.y,
+            vx: Math.cos(angle) * (80 + Math.random() * 120),
+            vy: Math.sin(angle) * (80 + Math.random() * 120),
+            life: 0.8,
+            maxLife: 0.8,
+            color: cmd.color || COLORS.cyan,
+            size: 4,
+            type: 'spark'
+        });
+    }
+}
+
+// Spawn a command pickup in the world
+function spawnCommandPickup(x, y, commandId) {
+    const cmd = COMMANDS[commandId];
+    if (!cmd) return;
+
+    commandPickups.push({
+        x,
+        y,
+        commandId,
+        bobPhase: Math.random() * Math.PI * 2,
+        pulsePhase: Math.random() * Math.PI * 2
+    });
+}
 
 // Start the game
 init();
