@@ -562,28 +562,12 @@ function handleTouchStart(e) {
             touch.leftStartY = y;
             touch.leftCurrentX = x;
             touch.leftCurrentY = y;
-            // Visual feedback
-            particles.push({
-                x: x, y: y,
-                vx: 0, vy: 0,
-                life: 0.5, maxLife: 0.5,
-                color: 'rgba(0, 255, 255, 0.5)', size: 30, type: 'spark'
-            });
-            showMessage('Joystick activated', 500);
         } else if (!isLeftSide && !touch.rightActive) {
             // Right side - attack swipe
             touch.rightActive = true;
             touch.rightId = t.identifier;
             touch.rightStartX = x;
             touch.rightStartY = y;
-            // Visual feedback
-            particles.push({
-                x: x, y: y,
-                vx: 0, vy: 0,
-                life: 0.5, maxLife: 0.5,
-                color: 'rgba(255, 0, 0, 0.5)', size: 30, type: 'spark'
-            });
-            showMessage('Attack swipe started', 500);
         }
     }
 }
@@ -2494,11 +2478,11 @@ function loadZone(zoneId, spawnX = null, spawnY = null) {
         player.y = zone.height / 2;
     }
 
+    // Create zone exits FIRST (before terrain, so walls can have gaps)
+    createZoneExits(zone);
+
     // Generate zone terrain
     generateZoneTerrain(zone);
-
-    // Create zone exits
-    createZoneExits(zone);
 
     // Populate zone with specific content (NPCs, pickups, etc.)
     populateZoneContent(zone);
