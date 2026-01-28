@@ -51,7 +51,7 @@ const game = {
     lastTime: 0,
     deltaTime: 0,
     time: 0,
-    currentZone: 'home_dir'  // Current zone/area ID
+    currentZone: null  // Current zone/area ID
 };
 
 // Zone definitions - each directory is a playable area
@@ -76,7 +76,7 @@ const ZONES = {
         maxEnemies: 8,
         exits: {
             north: { zone: 'home_dir', x: 450, y: 800 },
-            south: { zone: 'root_hub', x: 1600, y: 300 }
+            south: { zone: 'root_hub', x: 600, y: 300 }
         }
     },
     root_hub: {
@@ -2698,7 +2698,7 @@ function zoneSpawnDisabled(zoneId) {
 
 // Populate zone with story-specific content
 function populateZoneContent(zone) {
-    switch(zone.id) {
+    switch (zone.id) {
         case 'home_dir':
             populateHomeDir(zone);
             break;
@@ -2933,7 +2933,7 @@ function createZoneExits(zone) {
         let x, y;
 
         // Position exit based on direction
-        switch(direction) {
+        switch (direction) {
             case 'north':
                 x = exitData.x;
                 y = exitSize;

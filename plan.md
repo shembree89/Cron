@@ -251,3 +251,4 @@ Locations where ROM Chips and RAM Modules can be redeemed for permanent stat inc
 - ROM Chip / RAM Module upgrade shrines
 - Equipment system (binaries as weapons)
 - Death currency drop and recovery
+- ping is unlocked after beating cron and is needed to go accross the network to other computers. It also will flip bits so to get to the next computer you have to ping an unreachable block and flip the bit? or when you ping and it hits a block or something it sends it back?
