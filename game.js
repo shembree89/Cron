@@ -64,9 +64,7 @@ const ZONES = {
         height: 900,
         theme: 'safe',  // Affects visuals and enemy spawning
         maxEnemies: 0,   // Safe zone - no random spawns, just the guard
-        exits: {
-            south: { zone: 'home', x: 1200, y: 100 }  // Exit to /home/
-        }
+        exits: {}  // No initial exit - spawned when frozen zombie is killed
     },
     home: {
         id: 'home',
@@ -1251,6 +1249,21 @@ function update() {
                         });
                     }
 
+                    // Special: Frozen guard drops exit portal when killed
+                    if (e.type === 'frozen_guard' && game.currentZone === 'home_dir') {
+                        // Spawn the south exit portal where the zombie was
+                        exits.push({
+                            x: e.x,
+                            y: e.y,
+                            size: 80,
+                            targetZone: 'home',
+                            spawnX: 1200,
+                            spawnY: 100,
+                            direction: 'south'
+                        });
+                        showKernelMessage("The way forward is open. The corrupted /home/ directory awaits.", 4000);
+                    }
+
                     enemies.splice(j, 1);
                 }
 
@@ -1259,16 +1272,20 @@ function update() {
             }
         }
 
-        // Check block collision
-        for (let j = blocks.length - 1; j >= 0; j--) {
-            const b = blocks[j];
-            const dx = a.x - b.x;
-            const dy = a.y - b.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
+        // Check block collision (only terrain commands like 'rm' can damage blocks)
+        const cmd = COMMANDS[a.commandId];
+        const canDestroyTerrain = cmd && cmd.type === 'terrain';
 
-            if (dist < a.size + BLOCK_SIZE / 2) {
-                b.health -= 1;
-                attacks.splice(i, 1);
+        if (canDestroyTerrain) {
+            for (let j = blocks.length - 1; j >= 0; j--) {
+                const b = blocks[j];
+                const dx = a.x - b.x;
+                const dy = a.y - b.y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+
+                if (dist < a.size + BLOCK_SIZE / 2) {
+                    b.health -= 1;
+                    attacks.splice(i, 1);
 
                 // Block hit particles
                 for (let k = 0; k < 5; k++) {
@@ -1296,7 +1313,8 @@ function update() {
 
                     blocks.splice(j, 1);
                 }
-                break;
+                    break;
+                }
             }
         }
     }
