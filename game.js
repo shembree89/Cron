@@ -70,13 +70,13 @@ const ZONES = {
         id: 'home',
         name: '/home/',
         description: 'Corrupted Home - Overrun with Zombie Processes',
-        width: 2400,
-        height: 2400,
+        width: 1200,
+        height: 1200,
         theme: 'corrupted',
         maxEnemies: 8,
         exits: {
-            north: { zone: 'home_dir', x: 800, y: 1400 },
-            south: { zone: 'root_hub', x: 1200, y: 100 }
+            north: { zone: 'home_dir', x: 450, y: 800 },
+            south: { zone: 'root_hub', x: 1600, y: 300 }
         }
     },
     root_hub: {
@@ -88,9 +88,9 @@ const ZONES = {
         theme: 'hub',
         maxEnemies: 3,  // Light enemy presence
         exits: {
-            north: { zone: 'home', x: 1200, y: 2900 },
-            west: { zone: 'tmp', x: 3000, y: 1600 },
-            east: { zone: 'var_log', x: 200, y: 1600 },
+            north: { zone: 'home', x: 600, y: 1000 },
+            west: { zone: 'tmp', x: 2200, y: 1600 },
+            east: { zone: 'var_log', x: 400, y: 1600 },
             southeast: { zone: 'dev', x: 400, y: 400 },
             southwest: { zone: 'etc', x: 2800, y: 400 }
         }
@@ -104,7 +104,7 @@ const ZONES = {
         theme: 'chaotic',
         maxEnemies: 10,
         exits: {
-            east: { zone: 'root_hub', x: 200, y: 1600 }
+            east: { zone: 'root_hub', x: 400, y: 1600 }
         }
     },
     var_log: {
@@ -1023,6 +1023,13 @@ function update() {
 
     const dt = game.deltaTime;
 
+    // Tick down exit activation delays
+    for (const exit of exits) {
+        if (exit.activateDelay && exit.activateDelay > 0) {
+            exit.activateDelay -= dt;
+        }
+    }
+
     // Check zone transitions
     checkZoneTransitions();
 
@@ -1250,17 +1257,24 @@ function update() {
                     }
 
                     // Special: Frozen guard drops exit portal when killed
+                    // Bloated File boss drops exit when killed in /home
+                    if (e.type === 'bloated_file' && game.currentZone === 'home') {
+                        showKernelMessage("The Bloated File has been purged. The path to / is clear.", 4000);
+                    }
+
                     if (e.type === 'frozen_guard' && game.currentZone === 'home_dir') {
-                        // Spawn the south exit portal where the zombie was
-                        exits.push({
+                        // Spawn the south exit portal where the zombie was (with activation delay)
+                        const portal = {
                             x: e.x,
                             y: e.y,
                             size: 80,
                             targetZone: 'home',
-                            spawnX: 1200,
-                            spawnY: 100,
-                            direction: 'south'
-                        });
+                            spawnX: 600,
+                            spawnY: 250,
+                            direction: 'south',
+                            activateDelay: 1.5  // seconds before player can enter
+                        };
+                        exits.push(portal);
                         showKernelMessage("The way forward is open. The corrupted /home/ directory awaits.", 4000);
                     }
 
@@ -1325,6 +1339,21 @@ function update() {
         e.phase += dt * 5;
         e.glitchTimer -= dt;
         if (e.glitchTimer < 0) e.glitchTimer = 0;
+
+        // Bloated File swelling mechanic
+        if (e.type === 'bloated_file' && e.swellRate) {
+            e.size = Math.min(e.maxSwell, e.size + e.swellRate * dt);
+            // If it reaches max size, push the player away (corridor filled)
+            if (e.size >= e.maxSwell) {
+                const pdx = player.x - e.x;
+                const pdy = player.y - e.y;
+                const pdist = Math.sqrt(pdx * pdx + pdy * pdy);
+                if (pdist < e.size + 30 && pdist > 0) {
+                    player.x += (pdx / pdist) * 200 * dt;
+                    player.y += (pdy / pdist) * 200 * dt;
+                }
+            }
+        }
 
         const dx = player.x - e.x;
         const dy = player.y - e.y;
@@ -1556,7 +1585,11 @@ function render() {
 
     // Draw enemies
     for (const e of enemies) {
-        drawZombieProcess(e);
+        if (e.type === 'bloated_file') {
+            drawBloatedFile(e);
+        } else {
+            drawZombieProcess(e);
+        }
     }
 
     // Draw player
@@ -2227,6 +2260,80 @@ function drawZombieProcess(e) {
     ctx.shadowBlur = 0;
 }
 
+function drawBloatedFile(e) {
+    const { x, y, size, phase, health, maxHealth, glitchTimer, baseSize, maxSwell } = e;
+    const swellPct = (size - baseSize) / (maxSwell - baseSize);
+
+    ctx.save();
+    ctx.translate(x, y);
+
+    if (glitchTimer > 0) {
+        ctx.translate((Math.random() - 0.5) * 10, (Math.random() - 0.5) * 10);
+    }
+
+    // Pulsing bloated shape — irregular, organic blob
+    const color = `rgb(${180 + Math.floor(swellPct * 75)}, ${80 - Math.floor(swellPct * 60)}, ${200 - Math.floor(swellPct * 100)})`;
+    ctx.beginPath();
+    for (let i = 0; i < 12; i++) {
+        const angle = (i / 12) * Math.PI * 2;
+        const wobble = Math.sin(phase + i * 1.7) * size * 0.15;
+        const r = size + wobble;
+        const px = Math.cos(angle) * r;
+        const py = Math.sin(angle) * r;
+        if (i === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+    }
+    ctx.closePath();
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 3;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = 15 + swellPct * 15;
+    ctx.stroke();
+    ctx.fillStyle = `rgba(${180 + Math.floor(swellPct * 75)}, ${80 - Math.floor(swellPct * 60)}, ${200 - Math.floor(swellPct * 100)}, 0.3)`;
+    ctx.fill();
+
+    // Internal data corruption lines
+    ctx.beginPath();
+    for (let i = 0; i < 5; i++) {
+        const a1 = Math.sin(phase * 0.5 + i) * size * 0.5;
+        const a2 = Math.cos(phase * 0.3 + i * 2) * size * 0.5;
+        ctx.moveTo(a1, a2);
+        ctx.lineTo(-a2 * 0.7, a1 * 0.7);
+    }
+    ctx.strokeStyle = color;
+    ctx.lineWidth = 1;
+    ctx.globalAlpha = 0.5;
+    ctx.stroke();
+    ctx.globalAlpha = 1;
+
+    // Label
+    const fontSize = Math.max(10, Math.min(16, size * 0.3));
+    ctx.font = `bold ${Math.floor(fontSize)}px monospace`;
+    ctx.fillStyle = color;
+    ctx.textAlign = 'center';
+    ctx.textBaseline = 'middle';
+    ctx.shadowBlur = 8;
+    ctx.fillText('BLOAT', 0, 0);
+
+    // Health bar
+    ctx.shadowBlur = 0;
+    const barWidth = size * 2;
+    const barHeight = 5;
+    ctx.fillStyle = 'rgba(255, 0, 0, 0.4)';
+    ctx.fillRect(-barWidth / 2, -size - 16, barWidth, barHeight);
+    ctx.fillStyle = COLORS.red;
+    ctx.fillRect(-barWidth / 2, -size - 16, barWidth * (health / maxHealth), barHeight);
+
+    // Swell warning bar
+    ctx.fillStyle = 'rgba(255, 165, 0, 0.3)';
+    ctx.fillRect(-barWidth / 2, -size - 24, barWidth, 4);
+    ctx.fillStyle = 'rgba(255, 165, 0, 0.8)';
+    ctx.fillRect(-barWidth / 2, -size - 24, barWidth * swellPct, 4);
+
+    ctx.restore();
+    ctx.shadowBlur = 0;
+}
+
 function drawNPC(npc) {
     const pulse = Math.sin(game.time * 2) * 0.1 + 0.9;
     const size = npc.size || 30;
@@ -2564,7 +2671,7 @@ function populateHomeDir(zone) {
     enemies.push({
         x: centerX,
         y: Math.round((zone.height - 80 - BLOCK_SIZE) / BLOCK_SIZE) * BLOCK_SIZE,  // In the south wall gap
-        size: 22,
+        size: 30,
         speed: 0,  // Frozen - doesn't move
         health: 40,
         maxHealth: 40,
@@ -2579,8 +2686,31 @@ function populateHomeDir(zone) {
 
 // /home/ - Corrupted home with zombie processes
 function populateHome(zone) {
-    // No special content yet - just enemies
-    // TODO: Add Bloated File boss
+    const centerX = zone.width / 2;
+
+    // rm command pickup — terrain destruction ability
+    if (!storyProgress.discoveredCommands.has('rm')) {
+        spawnCommandPickup(centerX, zone.height / 2, 'rm');
+    }
+
+    // Bloated File mini-boss blocking the south exit
+    enemies.push({
+        x: centerX,
+        y: zone.height - 200,
+        size: 35,
+        speed: 0,
+        health: 120,
+        maxHealth: 120,
+        pid: 666,
+        bytes: 10,
+        phase: 0,
+        glitchTimer: 0,
+        type: 'bloated_file',
+        frozen: false,
+        swellRate: 3,       // grows this many pixels per second
+        maxSwell: 80,       // max radius before it "fills the corridor"
+        baseSize: 35
+    });
 }
 
 // / Root Hub - Central junction
@@ -2817,7 +2947,7 @@ function generateZoneTerrain(zone) {
     for (let x = margin; x < w - margin; x += bs) {
         const hasExit = exits.some(e => e.direction.includes('south') && Math.abs(e.x - x) < 120);
         // Leave gap for frozen guard in home_dir zone
-        const hasGuardGap = zone.id === 'home_dir' && Math.abs(x - w / 2) < 60;
+        const hasGuardGap = zone.id === 'home_dir' && Math.abs(x - w / 2) < 30;
         if (!hasExit && !hasGuardGap) {
             addBlock(snap(x), snap(h - margin - bs));
         }
@@ -2837,23 +2967,15 @@ function generateZoneTerrain(zone) {
         }
     }
 
-    // Add some scattered blocks based on zone theme
-    const blockCount = zone.theme === 'hub' ? 30 : 20;
-    for (let i = 0; i < blockCount; i++) {
-        const gridX = snap(margin + bs * 2 + Math.random() * (w - margin * 2 - bs * 4));
-        const gridY = snap(margin + bs * 2 + Math.random() * (h - margin * 2 - bs * 4));
-        // Don't place too close to center (player spawn)
-        const dx = gridX - w / 2;
-        const dy = gridY - h / 2;
-        if (Math.sqrt(dx * dx + dy * dy) > bs * 3) {
-            addBlock(gridX, gridY);
-        }
-    }
+    // Interior blocks are placed by zone-specific populate functions, not randomly
 }
 
 // Check and handle zone transitions
 function checkZoneTransitions() {
     for (const exit of exits) {
+        // Skip exits with activation delay
+        if (exit.activateDelay && exit.activateDelay > 0) continue;
+
         const dx = player.x - exit.x;
         const dy = player.y - exit.y;
         const dist = Math.sqrt(dx * dx + dy * dy);
