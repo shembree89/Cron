@@ -703,19 +703,28 @@ function resize() {
     canvas.height = game.height;
 }
 
-function addBlock(x, y) {
+function addBlock(x, y, indestructible) {
     // Check if block already exists at this position
     const exists = blocks.some(b => Math.abs(b.x - x) < 5 && Math.abs(b.y - y) < 5);
     if (exists) return;
 
-    const isStrong = Math.random() > 0.3;
-    blocks.push({
-        x: x,
-        y: y,
-        value: isStrong ? 1 : 0,
-        health: isStrong ? 3 : 1,
-        maxHealth: isStrong ? 3 : 1
-    });
+    if (indestructible) {
+        blocks.push({
+            x, y,
+            value: -1,  // null block
+            health: 9999,
+            maxHealth: 9999,
+            indestructible: true
+        });
+    } else {
+        const isStrong = Math.random() > 0.3;
+        blocks.push({
+            x, y,
+            value: isStrong ? 1 : 0,
+            health: isStrong ? 3 : 1,
+            maxHealth: isStrong ? 3 : 1
+        });
+    }
 }
 
 function handleKey(key, pressed) {
@@ -1297,7 +1306,7 @@ function update() {
             const dist = Math.sqrt(dx * dx + dy * dy);
 
             if (dist < a.size + BLOCK_SIZE / 2) {
-                if (canDestroyTerrain) {
+                if (canDestroyTerrain && !b.indestructible) {
                     b.health -= 1;
 
                     // Block hit particles
@@ -1692,42 +1701,57 @@ function drawCircuitBoard() {
 function drawBlock(b) {
     const size = BLOCK_SIZE;
     const halfSize = size / 2;
-    const healthRatio = b.health / b.maxHealth;
 
     ctx.save();
     ctx.translate(b.x, b.y);
 
-    // Block outline (memory cell style)
     ctx.beginPath();
     ctx.rect(-halfSize, -halfSize, size, size);
 
-    const color = b.value === 1 ? COLORS.green : COLORS.orange;
-    ctx.strokeStyle = color;
-    ctx.lineWidth = 2;
-    ctx.shadowColor = color;
-    ctx.shadowBlur = 8;
-    ctx.stroke();
+    if (b.indestructible) {
+        // Null boundary block — dim, dark, no glow
+        ctx.strokeStyle = 'rgba(80, 80, 100, 0.6)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        ctx.fillStyle = 'rgba(30, 30, 50, 0.8)';
+        ctx.fill();
 
-    // Fill based on health
-    ctx.fillStyle = `rgba(${b.value === 1 ? '0, 255, 0' : '255, 102, 0'}, ${0.1 + healthRatio * 0.2})`;
-    ctx.fill();
+        // "NULL" text
+        ctx.font = 'bold 9px monospace';
+        ctx.fillStyle = 'rgba(80, 80, 100, 0.7)';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText('NULL', 0, 0);
+    } else {
+        const healthRatio = b.health / b.maxHealth;
+        const color = b.value === 1 ? COLORS.green : COLORS.orange;
+        ctx.strokeStyle = color;
+        ctx.lineWidth = 2;
+        ctx.shadowColor = color;
+        ctx.shadowBlur = 8;
+        ctx.stroke();
 
-    // Binary value display
-    ctx.font = 'bold 16px monospace';
-    ctx.fillStyle = color;
-    ctx.textAlign = 'center';
-    ctx.textBaseline = 'middle';
-    ctx.shadowBlur = 10;
-    ctx.fillText(b.value.toString(), 0, 0);
+        // Fill based on health
+        ctx.fillStyle = `rgba(${b.value === 1 ? '0, 255, 0' : '255, 102, 0'}, ${0.1 + healthRatio * 0.2})`;
+        ctx.fill();
 
-    // Corner pins (like IC pins)
-    ctx.shadowBlur = 0;
-    ctx.fillStyle = COLORS.copper;
-    const pinSize = 3;
-    ctx.fillRect(-halfSize - pinSize, -halfSize + 5, pinSize, 4);
-    ctx.fillRect(-halfSize - pinSize, halfSize - 9, pinSize, 4);
-    ctx.fillRect(halfSize, -halfSize + 5, pinSize, 4);
-    ctx.fillRect(halfSize, halfSize - 9, pinSize, 4);
+        // Binary value display
+        ctx.font = 'bold 16px monospace';
+        ctx.fillStyle = color;
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.shadowBlur = 10;
+        ctx.fillText(b.value.toString(), 0, 0);
+
+        // Corner pins (like IC pins)
+        ctx.shadowBlur = 0;
+        ctx.fillStyle = COLORS.copper;
+        const pinSize = 3;
+        ctx.fillRect(-halfSize - pinSize, -halfSize + 5, pinSize, 4);
+        ctx.fillRect(-halfSize - pinSize, halfSize - 9, pinSize, 4);
+        ctx.fillRect(halfSize, -halfSize + 5, pinSize, 4);
+        ctx.fillRect(halfSize, halfSize - 9, pinSize, 4);
+    }
 
     ctx.restore();
     ctx.shadowBlur = 0;
@@ -2671,7 +2695,7 @@ function populateHomeDir(zone) {
     enemies.push({
         x: centerX,
         y: Math.round((zone.height - 80 - BLOCK_SIZE) / BLOCK_SIZE) * BLOCK_SIZE,  // In the south wall gap
-        size: 30,
+        size: 22,
         speed: 0,  // Frozen - doesn't move
         health: 40,
         maxHealth: 40,
@@ -2929,45 +2953,66 @@ function createZoneExits(zone) {
 function generateZoneTerrain(zone) {
     blocks = [];
     const bs = BLOCK_SIZE;
-    const margin = 80;
+    const margin = 40;
     const w = zone.width;
     const h = zone.height;
 
     const snap = (val) => Math.round(val / bs) * bs;
 
-    // Create room boundaries (outer walls)
-    // Top wall with gaps for exits
+    // Indestructible null boundary walls
+    // Top wall
     for (let x = margin; x < w - margin; x += bs) {
         const hasExit = exits.some(e => e.direction.includes('north') && Math.abs(e.x - x) < 120);
-        if (!hasExit) {
-            addBlock(snap(x), snap(margin));
-        }
+        if (!hasExit) addBlock(snap(x), snap(margin), true);
     }
-    // Bottom wall with gaps for exits (and frozen guard gap in home_dir)
+    // Bottom wall
     for (let x = margin; x < w - margin; x += bs) {
         const hasExit = exits.some(e => e.direction.includes('south') && Math.abs(e.x - x) < 120);
-        // Leave gap for frozen guard in home_dir zone
-        const hasGuardGap = zone.id === 'home_dir' && Math.abs(x - w / 2) < 30;
-        if (!hasExit && !hasGuardGap) {
-            addBlock(snap(x), snap(h - margin - bs));
-        }
+        // Leave gap for frozen guard in home_dir
+        const hasGuardGap = zone.id === 'home_dir' && Math.abs(x - w / 2) < bs;
+        if (!hasExit && !hasGuardGap) addBlock(snap(x), snap(h - margin - bs), true);
     }
-    // Left wall with gaps for exits
+    // Left wall
     for (let y = margin; y < h - margin; y += bs) {
         const hasExit = exits.some(e => e.direction.includes('west') && Math.abs(e.y - y) < 120);
-        if (!hasExit) {
-            addBlock(snap(margin), snap(y));
-        }
+        if (!hasExit) addBlock(snap(margin), snap(y), true);
     }
-    // Right wall with gaps for exits
+    // Right wall
     for (let y = margin; y < h - margin; y += bs) {
         const hasExit = exits.some(e => e.direction.includes('east') && Math.abs(e.y - y) < 120);
-        if (!hasExit) {
-            addBlock(snap(w - margin - bs), snap(y));
-        }
+        if (!hasExit) addBlock(snap(w - margin - bs), snap(y), true);
     }
 
-    // Interior blocks are placed by zone-specific populate functions, not randomly
+    // Random interior block clusters (groups of 3-6)
+    const area = w * h;
+    const clusterCount = Math.floor(area / 200000) + 3;
+    const innerMargin = margin + bs * 3;
+    for (let c = 0; c < clusterCount; c++) {
+        const cx = snap(innerMargin + Math.random() * (w - innerMargin * 2));
+        const cy = snap(innerMargin + Math.random() * (h - innerMargin * 2));
+        // Don't place too close to center (player spawn area)
+        const dx = cx - w / 2;
+        const dy = cy - h / 2;
+        if (Math.sqrt(dx * dx + dy * dy) < bs * 4) continue;
+        // Don't place too close to exits
+        const nearExit = exits.some(e => Math.sqrt((cx - e.x) ** 2 + (cy - e.y) ** 2) < 150);
+        if (nearExit) continue;
+
+        // Place a cluster of 3-6 blocks in an L, T, or line shape
+        const clusterSize = 3 + Math.floor(Math.random() * 4);
+        const placed = [{x: cx, y: cy}];
+        addBlock(cx, cy);
+        for (let i = 1; i < clusterSize; i++) {
+            const parent = placed[Math.floor(Math.random() * placed.length)];
+            const dir = Math.floor(Math.random() * 4);
+            const nx = parent.x + (dir === 0 ? bs : dir === 1 ? -bs : 0);
+            const ny = parent.y + (dir === 2 ? bs : dir === 3 ? -bs : 0);
+            if (nx > innerMargin && nx < w - innerMargin && ny > innerMargin && ny < h - innerMargin) {
+                addBlock(nx, ny);
+                placed.push({x: nx, y: ny});
+            }
+        }
+    }
 }
 
 // Check and handle zone transitions
