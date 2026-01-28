@@ -1276,45 +1276,46 @@ function update() {
         const cmd = COMMANDS[a.commandId];
         const canDestroyTerrain = cmd && cmd.type === 'terrain';
 
-        if (canDestroyTerrain) {
-            for (let j = blocks.length - 1; j >= 0; j--) {
-                const b = blocks[j];
-                const dx = a.x - b.x;
-                const dy = a.y - b.y;
-                const dist = Math.sqrt(dx * dx + dy * dy);
+        for (let j = blocks.length - 1; j >= 0; j--) {
+            const b = blocks[j];
+            const dx = a.x - b.x;
+            const dy = a.y - b.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
 
-                if (dist < a.size + BLOCK_SIZE / 2) {
+            if (dist < a.size + BLOCK_SIZE / 2) {
+                if (canDestroyTerrain) {
                     b.health -= 1;
-                    attacks.splice(i, 1);
 
-                // Block hit particles
-                for (let k = 0; k < 5; k++) {
-                    const angle = Math.random() * Math.PI * 2;
-                    particles.push({
-                        x: b.x,
-                        y: b.y,
-                        vx: Math.cos(angle) * (50 + Math.random() * 50),
-                        vy: Math.sin(angle) * (50 + Math.random() * 50),
-                        life: 0.4,
-                        maxLife: 0.4,
-                        color: b.value === 1 ? COLORS.green : COLORS.orange,
-                        size: 3,
-                        type: 'spark'
-                    });
-                }
-
-                if (b.health <= 0) {
-                    const bitsDropped = b.value === 1 ? 3 : 1;
-                    showMessage(`+${bitsDropped} Bits`, 1000);
-
-                    for (let k = 0; k < bitsDropped; k++) {
-                        spawnPickup(b.x, b.y, 'bit', 1);
+                    // Block hit particles
+                    for (let k = 0; k < 5; k++) {
+                        const angle = Math.random() * Math.PI * 2;
+                        particles.push({
+                            x: b.x,
+                            y: b.y,
+                            vx: Math.cos(angle) * (50 + Math.random() * 50),
+                            vy: Math.sin(angle) * (50 + Math.random() * 50),
+                            life: 0.4,
+                            maxLife: 0.4,
+                            color: b.value === 1 ? COLORS.green : COLORS.orange,
+                            size: 3,
+                            type: 'spark'
+                        });
                     }
 
-                    blocks.splice(j, 1);
+                    if (b.health <= 0) {
+                        const bitsDropped = b.value === 1 ? 3 : 1;
+                        showMessage(`+${bitsDropped} Bits`, 1000);
+
+                        for (let k = 0; k < bitsDropped; k++) {
+                            spawnPickup(b.x, b.y, 'bit', 1);
+                        }
+
+                        blocks.splice(j, 1);
+                    }
                 }
-                    break;
-                }
+                // All attacks are absorbed by blocks (stop on contact)
+                attacks.splice(i, 1);
+                break;
             }
         }
     }
@@ -2562,7 +2563,7 @@ function populateHomeDir(zone) {
     // This zombie doesn't move - player must kill it to escape
     enemies.push({
         x: centerX,
-        y: zone.height - 150,  // Near the south exit
+        y: Math.round((zone.height - 80 - BLOCK_SIZE) / BLOCK_SIZE) * BLOCK_SIZE,  // In the south wall gap
         size: 22,
         speed: 0,  // Frozen - doesn't move
         health: 40,
@@ -2812,10 +2813,12 @@ function generateZoneTerrain(zone) {
             addBlock(snap(x), snap(margin));
         }
     }
-    // Bottom wall with gaps for exits
+    // Bottom wall with gaps for exits (and frozen guard gap in home_dir)
     for (let x = margin; x < w - margin; x += bs) {
         const hasExit = exits.some(e => e.direction.includes('south') && Math.abs(e.x - x) < 120);
-        if (!hasExit) {
+        // Leave gap for frozen guard in home_dir zone
+        const hasGuardGap = zone.id === 'home_dir' && Math.abs(x - w / 2) < 60;
+        if (!hasExit && !hasGuardGap) {
             addBlock(snap(x), snap(h - margin - bs));
         }
     }
