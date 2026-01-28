@@ -1,4 +1,4 @@
-const CACHE_NAME = 'cron-game-v26';
+const CACHE_NAME = 'cron-game-v27';
 
 // Use absolute URLs resolved from the service worker location
 const BASE_PATH = self.location.pathname.replace(/\/[^\/]+$/, '/');

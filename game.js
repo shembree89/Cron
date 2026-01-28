@@ -335,6 +335,9 @@ let lastSpawn = 0;
 let spawnTimer = 0;
 let maxEnemiesForZone = 8;  // Will be set based on current zone
 
+// Zone state cache — persists blocks, enemies, exits, npcs, pickups between visits
+const zoneStateCache = {};
+
 // Attack projectiles (data packets)
 let attacks = [];
 
@@ -1050,7 +1053,7 @@ function update() {
 
     // Spawn enemies (respecting zone limits)
     spawnTimer += dt;
-    if (spawnTimer > 2 && enemies.length < maxEnemiesForZone) {
+    if (spawnTimer > 2 && enemies.length < maxEnemiesForZone && !zoneSpawnDisabled(game.currentZone)) {
         spawnEnemy();
         spawnTimer = 0;
     }
@@ -1265,9 +1268,13 @@ function update() {
                         });
                     }
 
-                    // Special: Frozen guard drops exit portal when killed
-                    // Bloated File boss drops exit when killed in /home
+                    // Bloated File boss defeated in /home
                     if (e.type === 'bloated_file' && game.currentZone === 'home') {
+                        storyProgress.defeatedBosses.add('bloated_file');
+                        // Kill all remaining zombies
+                        for (let k = enemies.length - 1; k >= 0; k--) {
+                            if (enemies[k].type === 'zombie') enemies.splice(k, 1);
+                        }
                         showKernelMessage("The Bloated File has been purged. The path to / is clear.", 4000);
                     }
 
@@ -2567,11 +2574,12 @@ function restartGame() {
     player.equippedCommand = null;
     player.attackCooldown = 0;
 
-    // Clear entities
+    // Clear entities and zone cache
     enemies.length = 0;
     attacks.length = 0;
     particles.length = 0;
     pickups.length = 0;
+    Object.keys(zoneStateCache).forEach(k => delete zoneStateCache[k]);
 
     // Reset story progress
     storyProgress.visitedZones.clear();
@@ -2595,12 +2603,27 @@ function restartGame() {
 // === ZONE SYSTEM ===
 
 // Load a new zone
+function saveZoneState() {
+    if (!game.currentZone) return;
+    zoneStateCache[game.currentZone] = {
+        blocks: JSON.parse(JSON.stringify(blocks)),
+        enemies: JSON.parse(JSON.stringify(enemies)),
+        exits: JSON.parse(JSON.stringify(exits)),
+        npcs: JSON.parse(JSON.stringify(npcs)),
+        commandPickups: JSON.parse(JSON.stringify(commandPickups)),
+        pickups: JSON.parse(JSON.stringify(pickups))
+    };
+}
+
 function loadZone(zoneId, spawnX = null, spawnY = null) {
     const zone = ZONES[zoneId];
     if (!zone) {
         console.error(`Zone ${zoneId} not found!`);
         return;
     }
+
+    // Save current zone state before leaving
+    saveZoneState();
 
     // Update game state
     game.currentZone = zoneId;
@@ -2611,13 +2634,9 @@ function loadZone(zoneId, spawnX = null, spawnY = null) {
     // Mark zone as visited
     storyProgress.visitedZones.add(zoneId);
 
-    // Clear entities
-    enemies.length = 0;
+    // Clear transient entities
     attacks.length = 0;
     particles.length = 0;
-    exits.length = 0;
-    commandPickups.length = 0;
-    // Don't clear pickups - they persist briefly
 
     // Position player at spawn point or center
     if (spawnX !== null && spawnY !== null) {
@@ -2628,20 +2647,38 @@ function loadZone(zoneId, spawnX = null, spawnY = null) {
         player.y = zone.height / 2;
     }
 
-    // Create zone exits FIRST (before terrain, so walls can have gaps)
-    createZoneExits(zone);
+    // Check for cached state
+    if (zoneStateCache[zoneId]) {
+        const cached = zoneStateCache[zoneId];
+        blocks = JSON.parse(JSON.stringify(cached.blocks));
+        enemies = JSON.parse(JSON.stringify(cached.enemies));
+        exits = JSON.parse(JSON.stringify(cached.exits));
+        npcs = JSON.parse(JSON.stringify(cached.npcs));
+        commandPickups = JSON.parse(JSON.stringify(cached.commandPickups));
+        pickups = JSON.parse(JSON.stringify(cached.pickups));
+    } else {
+        // Fresh zone — generate everything
+        enemies.length = 0;
+        exits.length = 0;
+        npcs.length = 0;
+        commandPickups.length = 0;
+        pickups.length = 0;
 
-    // Generate zone terrain
-    generateZoneTerrain(zone);
+        // Create zone exits FIRST (before terrain, so walls can have gaps)
+        createZoneExits(zone);
 
-    // Populate zone with specific content (NPCs, pickups, etc.)
-    populateZoneContent(zone);
+        // Generate zone terrain
+        generateZoneTerrain(zone);
 
-    // Spawn initial enemies (if allowed)
-    if (zone.maxEnemies > 0) {
-        const initialSpawn = Math.min(3, zone.maxEnemies);
-        for (let i = 0; i < initialSpawn; i++) {
-            spawnEnemy();
+        // Populate zone with specific content (NPCs, pickups, etc.)
+        populateZoneContent(zone);
+
+        // Spawn initial enemies (if allowed and no boss prevents it)
+        if (zone.maxEnemies > 0 && !zoneSpawnDisabled(zoneId)) {
+            const initialSpawn = Math.min(3, zone.maxEnemies);
+            for (let i = 0; i < initialSpawn; i++) {
+                spawnEnemy();
+            }
         }
     }
 
@@ -2651,6 +2688,12 @@ function loadZone(zoneId, spawnX = null, spawnY = null) {
 
     // Reset spawn timer
     spawnTimer = 0;
+}
+
+function zoneSpawnDisabled(zoneId) {
+    // No spawning in /home after bloat is defeated
+    if (zoneId === 'home' && storyProgress.defeatedBosses.has('bloated_file')) return true;
+    return false;
 }
 
 // Populate zone with story-specific content
@@ -2683,18 +2726,14 @@ function populateZoneContent(zone) {
 // ~/  Home Directory - Tutorial area
 function populateHomeDir(zone) {
     const centerX = zone.width / 2;
-    const centerY = zone.height / 2;
 
-    // Kill command pickup in center (first command to discover)
-    if (!storyProgress.discoveredCommands.has('kill')) {
-        spawnCommandPickup(centerX, centerY - 80, 'kill');
-    }
+    // Kill command pickup is placed inside a room by generateZoneRooms
 
     // Frozen zombie guard blocking the exit
     // This zombie doesn't move - player must kill it to escape
     enemies.push({
         x: centerX,
-        y: Math.round((zone.height - 80 - BLOCK_SIZE) / BLOCK_SIZE) * BLOCK_SIZE,  // In the south wall gap
+        y: Math.round((zone.height - 40 - BLOCK_SIZE) / BLOCK_SIZE) * BLOCK_SIZE,  // In the south wall gap (matches boundary wall y)
         size: 22,
         speed: 0,  // Frozen - doesn't move
         health: 40,
@@ -2712,29 +2751,29 @@ function populateHomeDir(zone) {
 function populateHome(zone) {
     const centerX = zone.width / 2;
 
-    // rm command pickup — terrain destruction ability
-    if (!storyProgress.discoveredCommands.has('rm')) {
-        spawnCommandPickup(centerX, zone.height / 2, 'rm');
-    }
+    // rm command pickup inside a room (placed by room generation)
+    // Handled by generateZoneRooms
 
-    // Bloated File mini-boss blocking the south exit
-    enemies.push({
-        x: centerX,
-        y: zone.height - 200,
-        size: 35,
-        speed: 0,
-        health: 120,
-        maxHealth: 120,
-        pid: 666,
-        bytes: 10,
-        phase: 0,
-        glitchTimer: 0,
-        type: 'bloated_file',
-        frozen: false,
-        swellRate: 3,       // grows this many pixels per second
-        maxSwell: 80,       // max radius before it "fills the corridor"
-        baseSize: 35
-    });
+    // Bloated File mini-boss blocking the south exit (if not already defeated)
+    if (!storyProgress.defeatedBosses.has('bloated_file')) {
+        enemies.push({
+            x: centerX,
+            y: zone.height - 200,
+            size: 35,
+            speed: 0,
+            health: 120,
+            maxHealth: 120,
+            pid: 666,
+            bytes: 10,
+            phase: 0,
+            glitchTimer: 0,
+            type: 'bloated_file',
+            frozen: false,
+            swellRate: 3,
+            maxSwell: 80,
+            baseSize: 35
+        });
+    }
 }
 
 // / Root Hub - Central junction
@@ -2783,10 +2822,7 @@ function populateRootHub(zone) {
 
 // /tmp/ - Chaotic first dungeon
 function populateTmp(zone) {
-    // Ping command pickup
-    if (!storyProgress.discoveredCommands.has('ping')) {
-        spawnCommandPickup(zone.width / 2, zone.height / 2, 'ping');
-    }
+    // Ping command is placed inside a room by generateZoneRooms
     // TODO: Add Garbage Collector boss
 }
 
@@ -2797,10 +2833,7 @@ function populateVarLog(zone) {
 
 // /dev/ - Device/industrial area
 function populateDev(zone) {
-    // Fork command pickup
-    if (!storyProgress.discoveredCommands.has('fork')) {
-        spawnCommandPickup(zone.width / 2 + 200, zone.height / 2, 'fork');
-    }
+    // Fork command is placed inside a room by generateZoneRooms
     // TODO: Add Null Pointer enemies and Pipeline puzzle
 }
 
@@ -2983,34 +3016,103 @@ function generateZoneTerrain(zone) {
         if (!hasExit) addBlock(snap(w - margin - bs), snap(y), true);
     }
 
-    // Random interior block clusters (groups of 3-6)
-    const area = w * h;
-    const clusterCount = Math.floor(area / 200000) + 3;
-    const innerMargin = margin + bs * 3;
-    for (let c = 0; c < clusterCount; c++) {
-        const cx = snap(innerMargin + Math.random() * (w - innerMargin * 2));
-        const cy = snap(innerMargin + Math.random() * (h - innerMargin * 2));
-        // Don't place too close to center (player spawn area)
-        const dx = cx - w / 2;
-        const dy = cy - h / 2;
-        if (Math.sqrt(dx * dx + dy * dy) < bs * 4) continue;
-        // Don't place too close to exits
-        const nearExit = exits.some(e => Math.sqrt((cx - e.x) ** 2 + (cy - e.y) ** 2) < 150);
-        if (nearExit) continue;
+    // Generate designed rooms for this zone
+    generateZoneRooms(zone);
+}
 
-        // Place a cluster of 3-6 blocks in an L, T, or line shape
-        const clusterSize = 3 + Math.floor(Math.random() * 4);
-        const placed = [{x: cx, y: cy}];
-        addBlock(cx, cy);
-        for (let i = 1; i < clusterSize; i++) {
-            const parent = placed[Math.floor(Math.random() * placed.length)];
-            const dir = Math.floor(Math.random() * 4);
-            const nx = parent.x + (dir === 0 ? bs : dir === 1 ? -bs : 0);
-            const ny = parent.y + (dir === 2 ? bs : dir === 3 ? -bs : 0);
-            if (nx > innerMargin && nx < w - innerMargin && ny > innerMargin && ny < h - innerMargin) {
-                addBlock(nx, ny);
-                placed.push({x: nx, y: ny});
+// Build a rectangular room out of destructible blocks with a doorway
+// rx, ry = top-left corner in grid coords, rw/rh = size in blocks
+function buildRoom(rx, ry, rw, rh, doorSide, doorPos) {
+    const bs = BLOCK_SIZE;
+    for (let bx = 0; bx < rw; bx++) {
+        for (let by = 0; by < rh; by++) {
+            // Only walls (edges of the rectangle)
+            const isEdge = bx === 0 || bx === rw - 1 || by === 0 || by === rh - 1;
+            if (!isEdge) continue;
+            // Doorway gap
+            if (doorSide === 'north' && by === 0 && Math.abs(bx - doorPos) < 1) continue;
+            if (doorSide === 'south' && by === rh - 1 && Math.abs(bx - doorPos) < 1) continue;
+            if (doorSide === 'west' && bx === 0 && Math.abs(by - doorPos) < 1) continue;
+            if (doorSide === 'east' && bx === rw - 1 && Math.abs(by - doorPos) < 1) continue;
+            addBlock(rx + bx * bs, ry + by * bs);
+        }
+    }
+    // Return center of room for placing items
+    return { x: rx + Math.floor(rw / 2) * bs, y: ry + Math.floor(rh / 2) * bs };
+}
+
+// Generate designed rooms per zone
+function generateZoneRooms(zone) {
+    const bs = BLOCK_SIZE;
+    const margin = 120; // keep rooms away from boundary walls
+    const w = zone.width;
+    const h = zone.height;
+    const snap = (val) => Math.round(val / bs) * bs;
+
+    // Zone-specific room layouts
+    switch (zone.id) {
+        case 'home_dir': {
+            // Small tutorial zone — just one small room holding the kill command
+            const roomCenter = buildRoom(snap(w / 2 - bs * 2), snap(h / 2 - bs * 3), 5, 4, 'south', 2);
+            if (!storyProgress.discoveredCommands.has('kill')) {
+                spawnCommandPickup(roomCenter.x, roomCenter.y, 'kill');
             }
+            break;
+        }
+        case 'home': {
+            // Two rooms: one with rm command, one empty for exploration
+            const room1 = buildRoom(snap(w * 0.25 - bs * 2), snap(h * 0.3), 6, 5, 'east', 2);
+            if (!storyProgress.discoveredCommands.has('rm')) {
+                spawnCommandPickup(room1.x, room1.y, 'rm');
+            }
+            const room2 = buildRoom(snap(w * 0.65), snap(h * 0.25), 5, 4, 'west', 2);
+            break;
+        }
+        case 'root_hub': {
+            // Central hub — a few rooms scattered around the large space
+            buildRoom(snap(w * 0.15), snap(h * 0.15), 6, 5, 'south', 3);
+            buildRoom(snap(w * 0.65), snap(h * 0.15), 5, 5, 'south', 2);
+            buildRoom(snap(w * 0.15), snap(h * 0.6), 5, 4, 'east', 2);
+            buildRoom(snap(w * 0.6), snap(h * 0.6), 7, 5, 'north', 3);
+            break;
+        }
+        case 'tmp': {
+            // Chaotic zone — scattered rooms of varying sizes
+            const room1 = buildRoom(snap(w * 0.15), snap(h * 0.2), 5, 4, 'east', 2);
+            if (!storyProgress.discoveredCommands.has('ping')) {
+                spawnCommandPickup(room1.x, room1.y, 'ping');
+            }
+            buildRoom(snap(w * 0.55), snap(h * 0.15), 6, 5, 'south', 3);
+            buildRoom(snap(w * 0.3), snap(h * 0.55), 5, 5, 'north', 2);
+            buildRoom(snap(w * 0.65), snap(h * 0.6), 4, 4, 'west', 2);
+            break;
+        }
+        case 'var_log': {
+            // Archive — long rectangular rooms like filing cabinets
+            buildRoom(snap(w * 0.1), snap(h * 0.15), 8, 3, 'east', 1);
+            buildRoom(snap(w * 0.1), snap(h * 0.4), 8, 3, 'east', 1);
+            buildRoom(snap(w * 0.5), snap(h * 0.25), 7, 4, 'west', 2);
+            buildRoom(snap(w * 0.5), snap(h * 0.55), 7, 3, 'west', 1);
+            break;
+        }
+        case 'dev': {
+            // Industrial — rooms with machinery feel
+            const room1 = buildRoom(snap(w * 0.15), snap(h * 0.2), 6, 6, 'south', 3);
+            if (!storyProgress.discoveredCommands.has('fork')) {
+                spawnCommandPickup(room1.x, room1.y, 'fork');
+            }
+            buildRoom(snap(w * 0.55), snap(h * 0.15), 5, 5, 'west', 2);
+            buildRoom(snap(w * 0.35), snap(h * 0.55), 7, 5, 'north', 3);
+            break;
+        }
+        case 'etc': {
+            // Structured — orderly grid of rooms
+            buildRoom(snap(w * 0.1), snap(h * 0.15), 5, 5, 'east', 2);
+            buildRoom(snap(w * 0.4), snap(h * 0.15), 5, 5, 'south', 2);
+            buildRoom(snap(w * 0.7), snap(h * 0.15), 5, 5, 'west', 2);
+            buildRoom(snap(w * 0.25), snap(h * 0.5), 6, 5, 'north', 3);
+            buildRoom(snap(w * 0.6), snap(h * 0.5), 6, 5, 'north', 3);
+            break;
         }
     }
 }
