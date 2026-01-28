@@ -9,7 +9,7 @@
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
     <title>Cron - The Process Wars</title>
-    <link rel="stylesheet" href="style.css?v=28">
+    <link rel="stylesheet" href="style.css?v=29">
     <link rel="manifest" href="manifest.json">
     <link rel="apple-touch-icon" href="icon-192.png">
 </head>
@@ -84,8 +84,12 @@
                 <button id="dialogue-next" class="ui-btn primary">NEXT >></button>
             </div>
         </div>
+
+        <div id="kernel-narrator" class="hidden">
+            <div id="kernel-message"></div>
+        </div>
     </div>
-    <script src="game.js?v=28"></script>
+    <script src="game.js?v=29"></script>
     <script>
         // Register service worker for PWA
         if ('serviceWorker' in navigator) {

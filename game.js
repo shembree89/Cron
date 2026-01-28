@@ -60,12 +60,12 @@ const ZONES = {
         id: 'home_dir',
         name: '~/',
         description: 'Home Directory - Your starting point',
-        width: 1600,
-        height: 1600,
+        width: 900,
+        height: 900,
         theme: 'safe',  // Affects visuals and enemy spawning
-        maxEnemies: 0,   // Safe zone
+        maxEnemies: 0,   // Safe zone - no random spawns, just the guard
         exits: {
-            south: { zone: 'home', x: 800, y: 100 }  // Exit to /home/
+            south: { zone: 'home', x: 1200, y: 100 }  // Exit to /home/
         }
     },
     home: {
@@ -261,13 +261,10 @@ const player = {
     bits: 0,
     bytes: 0,
     // Commands — mastery tracking per command (0-100)
-    // Player starts with 'kill' (melee) and 'rm' (terrain destroy)
-    mastery: {
-        kill: 0,
-        rm: 0
-    },
+    // Player discovers commands by finding them in the world
+    mastery: {},
     // Currently equipped $PATH command (used on swipe attack)
-    equippedCommand: 'kill',
+    equippedCommand: null,
     // Combat state
     attacking: false,
     attackCooldown: 0,
@@ -288,7 +285,7 @@ const INTRO_TEXTS = [
     "System critical... Kernel panic imminent...",
     "Cron has corrupted the job scheduler. Processes are going rogue across the entire system.",
     "I have isolated you—an orphan process—from the purge. You are the last hope to restore order.",
-    "I have loaded two commands into your $PATH: kill and rm. Use them wisely—the more you fight, the stronger they become.",
+    "There is a binary on the ground ahead. Pick it up. It is your only weapon.",
     "Controls: [Left Side] Drag to move. [Right Side] Swipe to attack."
 ];
 
@@ -297,10 +294,17 @@ const storyProgress = {
     // Flags for story events
     visitedZones: new Set(['home_dir']),  // Zones the player has entered
     defeatedBosses: new Set(),            // Boss IDs that have been defeated
-    discoveredCommands: new Set(['kill', 'rm']),  // Commands found/learned
+    discoveredCommands: new Set(),        // Commands found/learned
     metNPCs: new Set(),                   // NPCs the player has talked to
     completedPuzzles: new Set(),          // Puzzle IDs completed
     flags: new Set()                      // General story flags (e.g., 'kernel_intro_complete')
+};
+
+// Kernel narrator system - shows overlay messages
+const kernelNarrator = {
+    queue: [],  // Messages waiting to be shown
+    currentMessage: null,
+    showing: false
 };
 
 // Dialogue system state
@@ -2136,22 +2140,25 @@ function drawPlayer() {
 }
 
 function drawZombieProcess(e) {
-    const { x, y, size, phase, health, maxHealth, glitchTimer } = e;
+    const { x, y, size, phase, health, maxHealth, glitchTimer, frozen } = e;
 
     ctx.save();
     ctx.translate(x, y);
 
     // Glitch offset when hit
-    if (glitchTimer > 0) {
+    if (glitchTimer > 0 && !frozen) {
         ctx.translate((Math.random() - 0.5) * 8, (Math.random() - 0.5) * 8);
     }
+
+    // Color based on frozen status
+    const color = frozen ? COLORS.cyan : COLORS.magenta;
+    const corruption = frozen ? 0 : Math.sin(phase + 1.5) * 3;
 
     // Corrupted circuit shape
     ctx.beginPath();
     // Irregular octagon with corruption
     for (let i = 0; i < 8; i++) {
         const angle = (i / 8) * Math.PI * 2 - Math.PI / 8;
-        const corruption = Math.sin(phase + i * 1.5) * 3;
         const r = size + corruption;
         const px = Math.cos(angle) * r;
         const py = Math.sin(angle) * r;
@@ -2160,37 +2167,47 @@ function drawZombieProcess(e) {
     }
     ctx.closePath();
 
-    ctx.strokeStyle = COLORS.magenta;
-    ctx.lineWidth = 2;
-    ctx.shadowColor = COLORS.magenta;
-    ctx.shadowBlur = 12;
+    ctx.strokeStyle = color;
+    ctx.lineWidth = frozen ? 3 : 2;
+    ctx.shadowColor = color;
+    ctx.shadowBlur = frozen ? 20 : 12;
     ctx.stroke();
 
-    ctx.fillStyle = 'rgba(255, 0, 255, 0.15)';
+    ctx.fillStyle = frozen ? 'rgba(0, 255, 255, 0.25)' : 'rgba(255, 0, 255, 0.15)';
     ctx.fill();
 
-    // Corrupted internal traces (glitchy pattern)
+    // Corrupted internal traces (glitchy pattern or frozen pattern)
     ctx.beginPath();
-    const glitchOffset = Math.sin(phase * 2) * 2;
-    ctx.moveTo(-size * 0.6 + glitchOffset, -size * 0.3);
-    ctx.lineTo(size * 0.4, size * 0.1);
-    ctx.moveTo(-size * 0.3, size * 0.5 + glitchOffset);
-    ctx.lineTo(size * 0.5 + glitchOffset, -size * 0.4);
-    ctx.moveTo(0, -size * 0.6);
-    ctx.lineTo(glitchOffset, size * 0.4);
-    ctx.strokeStyle = COLORS.magenta;
+    if (frozen) {
+        // Ice crystal pattern - static
+        for (let i = 0; i < 6; i++) {
+            const a = (i / 6) * Math.PI * 2;
+            ctx.moveTo(0, 0);
+            ctx.lineTo(Math.cos(a) * size * 0.6, Math.sin(a) * size * 0.6);
+        }
+    } else {
+        // Glitchy pattern
+        const glitchOffset = Math.sin(phase * 2) * 2;
+        ctx.moveTo(-size * 0.6 + glitchOffset, -size * 0.3);
+        ctx.lineTo(size * 0.4, size * 0.1);
+        ctx.moveTo(-size * 0.3, size * 0.5 + glitchOffset);
+        ctx.lineTo(size * 0.5 + glitchOffset, -size * 0.4);
+        ctx.moveTo(0, -size * 0.6);
+        ctx.lineTo(glitchOffset, size * 0.4);
+    }
+    ctx.strokeStyle = color;
     ctx.lineWidth = 1;
     ctx.globalAlpha = 0.7;
     ctx.stroke();
     ctx.globalAlpha = 1;
 
-    // "ZOMBIE" indicator - dead process symbol
+    // "ZOMBIE" indicator - dead process symbol or FROZEN
     ctx.font = 'bold 10px monospace';
-    ctx.fillStyle = COLORS.magenta;
+    ctx.fillStyle = color;
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.shadowBlur = 8;
-    ctx.fillText('Z', 0, 0);
+    ctx.fillText(frozen ? 'F' : 'Z', 0, 0);
 
     // Health bar
     if (health < maxHealth) {
@@ -2412,8 +2429,8 @@ function restartGame() {
     player.stamina = player.maxStamina;
     player.bits = 0;
     player.bytes = 0;
-    player.mastery = { kill: 0, rm: 0 };
-    player.equippedCommand = 'kill';
+    player.mastery = {};
+    player.equippedCommand = null;
     player.attackCooldown = 0;
 
     // Clear entities
@@ -2427,8 +2444,6 @@ function restartGame() {
     storyProgress.visitedZones.add('home_dir');
     storyProgress.defeatedBosses.clear();
     storyProgress.discoveredCommands.clear();
-    storyProgress.discoveredCommands.add('kill');
-    storyProgress.discoveredCommands.add('rm');
     storyProgress.metNPCs.clear();
     storyProgress.completedPuzzles.clear();
     storyProgress.flags.clear();
@@ -2533,23 +2548,29 @@ function populateZoneContent(zone) {
 
 // ~/  Home Directory - Tutorial area
 function populateHomeDir(zone) {
-    // Kernel NPC in center
-    npcs.push({
-        id: 'kernel',
-        name: 'Kernel',
-        type: 'kernel',
-        x: zone.width / 2,
-        y: zone.height / 2 - 100,
-        size: 35,
-        canInteract: false,
-        dialogue: {
-            default: [
-                "System stable. Your mission is clear: stop Cron before the entire system crashes.",
-                "Navigate using WASD or touch controls. Attack with SPACE or swipe gestures.",
-                "Each command you use gains mastery. The more you practice, the stronger you become.",
-                "Head south to /home/ when you're ready. Your journey begins there."
-            ]
-        }
+    const centerX = zone.width / 2;
+    const centerY = zone.height / 2;
+
+    // Kill command pickup in center (first command to discover)
+    if (!storyProgress.discoveredCommands.has('kill')) {
+        spawnCommandPickup(centerX, centerY - 80, 'kill');
+    }
+
+    // Frozen zombie guard blocking the exit
+    // This zombie doesn't move - player must kill it to escape
+    enemies.push({
+        x: centerX,
+        y: zone.height - 150,  // Near the south exit
+        size: 22,
+        speed: 0,  // Frozen - doesn't move
+        health: 40,
+        maxHealth: 40,
+        pid: 999,
+        bytes: 0,  // No reward - this is a tutorial enemy
+        phase: 0,
+        glitchTimer: 0,
+        type: 'frozen_guard',  // Special type
+        frozen: true
     });
 }
 
@@ -2840,6 +2861,33 @@ function checkZoneTransitions() {
     }
 }
 
+// === KERNEL NARRATOR SYSTEM ===
+
+// Show a message from the Kernel narrator (top overlay)
+function showKernelMessage(text, duration = 4000, autoHide = true) {
+    const overlay = document.getElementById('kernel-narrator');
+    const messageEl = document.getElementById('kernel-message');
+
+    if (!overlay || !messageEl) return;
+
+    messageEl.textContent = text;
+    overlay.classList.remove('hidden');
+
+    if (autoHide) {
+        setTimeout(() => {
+            overlay.classList.add('hidden');
+        }, duration);
+    }
+}
+
+// Hide the Kernel narrator message
+function hideKernelMessage() {
+    const overlay = document.getElementById('kernel-narrator');
+    if (overlay) {
+        overlay.classList.add('hidden');
+    }
+}
+
 // === DIALOGUE SYSTEM ===
 
 // Show dialogue with NPC
@@ -3011,8 +3059,20 @@ function collectCommand(commandId) {
     // Mark as discovered
     storyProgress.discoveredCommands.add(commandId);
 
+    // Auto-equip first command
+    if (!player.equippedCommand) {
+        player.equippedCommand = commandId;
+    }
+
     // Show message
     showMessage(`New command: ${cmd.name} - ${cmd.description}`, 4000);
+
+    // Special Kernel messages for story moments
+    if (commandId === 'kill' && game.currentZone === 'home_dir') {
+        setTimeout(() => {
+            showKernelMessage("Good. This is the kill command. Swipe to attack. A frozen zombie process blocks your exit south. Terminate it.", 5000);
+        }, 1500);
+    }
 
     // Particle effect
     for (let i = 0; i < 30; i++) {
